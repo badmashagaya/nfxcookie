@@ -2,63 +2,316 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OOR System Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OOR Data Importer</title>
+    
     <style>
+        @import url('https://fonts.cdnfonts.com/css/nexa-bold');
+    </style>
+
+    <style>
+        /* CSS Variables & Global Resets */
+        :root {
+            --bg-color: #000000;
+            --card-bg: #06060c;
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e99;
+            --accent: rgb(0, 136, 255);
+            --border: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+            box-sizing: border-box;
+        }
+
         body {
-            margin: 0; padding: 40px; font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-            color: #fff; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; gap: 40px; flex-wrap: wrap;
+            margin: 0; padding: 40px 20px; 
+            font-family: 'Nexa', sans-serif;
+            font-weight: 300;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 20px; padding: 40px; width: 450px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        
+        /* Apple-style Segmented Control (Slider) */
+        .segmented-control {
+            display: flex; position: relative;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px; padding: 4px; margin-bottom: 40px;
+            width: 320px;
         }
-        h2 { margin-top: 0; font-weight: 400; letter-spacing: 2px; text-align: center; margin-bottom: 30px;}
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-size: 13px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;}
-        select, input[type="file"], input[type="text"] {
-            width: 100%; padding: 14px; border-radius: 10px;
-            background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255,255,255,0.1);
-            color: white; outline: none; box-sizing: border-box; font-size: 15px;
+        .segment-btn {
+            flex: 1; text-align: center; padding: 10px 0;
+            font-size: 13px; font-weight: 700; color: var(--text-secondary);
+            cursor: pointer; z-index: 2; transition: color 0.3s ease;
         }
-        option { background: #16213e; color: white;}
-        button {
-            width: 100%; padding: 16px; border-radius: 10px; margin-top: 10px;
-            background: rgba(255, 255, 255, 0.9); color: #1a1a2e; border: none;
-            font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s;
+        .segment-btn.active { color: var(--text-primary); }
+        .segment-highlight {
+            position: absolute; top: 4px; left: 4px;
+            width: calc(50% - 4px); height: calc(100% - 8px);
+            background: #2c2c2e; border-radius: 8px;
+            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        button:hover { background: #ffffff; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,255,255,0.2);}
-        .status { margin-top: 20px; font-size: 14px; text-align: center; color: #4ecca3; font-weight: bold; word-break: break-all;}
+
+        /* Card Container */
+        .import-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 40px 30px;
+            width: 100%; max-width: 340px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.05);
+            display: none; 
+            animation: fadeIn 0.4s ease forwards;
+        }
+        .import-card.active-card { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 { margin: 0 0 10px 0; font-size: 20px; font-weight: 700; text-align: center; letter-spacing: 0.5px;}
+        p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 30px 0; text-align: center;}
+
+        /* Custom File Dropzone */
+        .file-upload-wrapper {
+            position: relative;
+            border: 1px dashed rgba(255,255,255,0.2);
+            border-radius: 14px;
+            padding: 25px 20px;
+            text-align: center;
+            background: var(--input-bg);
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+        .file-upload-wrapper:hover {
+            border-color: rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.08);
+        }
+        .file-upload-wrapper input[type="file"] {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            opacity: 0; cursor: pointer; z-index: 2;
+        }
+        .file-upload-content {
+            display: flex; flex-direction: column; align-items: center; pointer-events: none;
+        }
+        .file-upload-content img {
+            width: 45px; height: 45px; margin-bottom: 10px;
+        }
+        .file-name-display {
+            font-size: 13px; color: var(--text-secondary); font-weight: 700;
+            word-break: break-all;
+        }
+
+        /* Form Inputs */
+        .form-group { margin-bottom: 16px; position: relative; }
+        label { display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-secondary); font-weight: 700; padding-left: 2px;}
+        
+        select, input[type="text"] {
+            width: 100%; padding: 14px 16px; border-radius: 12px;
+            background: var(--input-bg); border: 1px solid var(--border);
+            color: white; outline: none; font-size: 14px; font-weight: 700;
+            font-family: 'Nexa', sans-serif; transition: 0.2s;
+            appearance: none; -webkit-appearance: none;
+        }
+        select:focus, input[type="text"]:focus {
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.08);
+        }
+        
+        /* Custom Arrow for Select */
+        .select-wrapper::after {
+            content: ''; position: absolute; right: 16px; top: 50%;
+            transform: translateY(-50%); width: 12px; height: 12px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-size: contain; background-repeat: no-repeat;
+            pointer-events: none; opacity: 0.5;
+        }
+        option { background: #1c1c1e; color: white; font-weight: 300;}
+
+        /* Buttons */
+        .btn-white {
+            width: 100%; padding: 16px; border-radius: 14px; margin-top: 10px;
+            background: #ffffff; color: #000000; border: none;
+            font-size: 15px; font-weight: 700; font-family: 'Nexa', sans-serif;
+            cursor: pointer; transition: transform 0.1s ease, opacity 0.2s;
+            box-shadow: 0 4px 14px rgba(255,255,255,0.1);
+        }
+        .btn-white:active { transform: scale(0.96); }
+        .btn-white:disabled { background: #333; color: #666; cursor: not-allowed; box-shadow: none; transform: none;}
+
+        /* Animated Icons */
+        .icon-wrapper {
+            width: 60px; height: 60px; margin: 0 auto 20px auto;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .icon-wrapper svg { width: 100%; height: 100%; }
+        .spin { animation: spin 1.5s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%; height: 6px; background: rgba(255,255,255,0.1); 
+            border-radius: 6px; margin: 20px 0 10px 0; overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%; width: 0%; 
+            background: var(--accent);
+            transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .eta-text { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-align: center; margin-bottom: 30px; }
+
+        /* JSON Result Box */
+        .json-summary {
+            margin-top: 20px; padding: 16px; background: rgba(0,0,0,0.3); 
+            border-radius: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; 
+            font-size: 12px; color: #34c759; white-space: pre-wrap; text-align: left;
+            border: 1px solid var(--border); max-height: 250px; overflow-y: auto;
+        }
+
+        #screen-loading, #screen-done { display: none; }
     </style>
 </head>
 <body>
 
-<div class="glass-panel">
-    <h2>OOR DATABASE UPLOAD</h2>
-    <form id="uploadForm">
-        <div class="form-group">
-            <label>Upload Archive (.zip / .txt)</label>
-            <input type="file" id="fileInput" required>
+<div class="segmented-control">
+    <div class="segment-highlight" id="segmentHighlight"></div>
+    <div class="segment-btn active" id="tab-upload" onclick="switchTab('upload')">Configure Database</div>
+    <div class="segment-btn" id="tab-tv" onclick="switchTab('tv')">TV Automation</div>
+</div>
+
+<div class="import-card active-card" id="card-upload">
+    
+    <div id="screen-setup">
+        <h2>Configure Database</h2>
+        <p>Upload your archive to process and safely<br>store the entries.</p>
+        
+        <form id="uploadForm">
+            <div class="file-upload-wrapper">
+                <input type="file" id="fileInput" accept=".zip,.txt" required onchange="updateFileName(this)">
+                <div class="file-upload-content">
+                    <img src="https://img.icons8.com/pulsar-gradient/420/upload.png" alt="Upload">
+                    <span class="file-name-display" id="fileNameDisplay">Tap to select .ZIP or .TXT</span>
+                </div>
+            </div>
+            
+            <div class="form-group select-wrapper">
+                <label>Require Plan</label>
+                <select id="planFilter">
+                    <option value="">Any Plan</option>
+                    <option value="Premium">Premium</option>
+                    <option value="Standard">Standard</option>
+                    <option value="Standard With Ads">Standard With Ads</option>
+                    <option value="Basic">Basic</option>
+                    <option value="Basic With Ads">Basic With Ads</option>
+                    <option value="Mobile">Mobile</option>
+                </select>
+            </div>
+            
+            <div class="form-group select-wrapper">
+                <label>Require Quality</label>
+                <select id="qualityFilter">
+                    <option value="">Any Quality</option>
+                    <option value="UHD">UHD</option>
+                    <option value="HD">HD</option>
+                    <option value="SD">SD</option>
+                </select>
+            </div>
+            
+            <div class="form-group select-wrapper" style="margin-bottom: 30px;">
+                <label>Require Display Language</label>
+                <select id="languageFilter">
+                    <option value="">Any Language</option>
+                    <option value="English">English</option>
+                    <option value="Vietnamese">Vietnamese</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="Portuguese">Portuguese</option>
+                    <option value="French">French</option>
+                    <option value="Polish">Polish</option>
+                    <option value="Turkish">Turkish</option>
+                    <option value="Thai">Thai</option>
+                    <option value="Arabic">Arabic</option>
+                    <option value="Indonesian">Indonesian</option>
+                    <option value="Italian/Generic">Italian</option>
+                    <option value="Dutch/Generic">Dutch</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn-white" id="uploadBtn">Upload</button>
+        </form>
+    </div>
+
+    <div id="screen-loading">
+        <div class="icon-wrapper spin">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke-dasharray="2 2"/>
+                <path d="M12 8l-4 4h8l-4-4z" fill="#ffffff" stroke="none"/>
+            </svg>
         </div>
         
+        <h2>Importing data</h2>
+        <p>Please wait a few seconds while we're<br>importing your data for the project.</p>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progBar"></div>
+        </div>
+        <div class="eta-text" id="etaText">Calculating ETA...</div>
+
+        <button type="button" class="btn-white" onclick="window.location.reload()">Cancel</button>
+    </div>
+
+    <div id="screen-done">
+        <div class="icon-wrapper">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M8 12l3 3 5-6"/>
+            </svg>
+        </div>
+        
+        <h2>Done</h2>
+        <p>Your data has been successfully<br>processed and verified.</p>
+        
+        <button type="button" class="btn-white" onclick="window.location.reload()">Return</button>
+        
+        <div class="json-summary" id="summaryBox"></div>
+    </div>
+</div>
+
+<div class="import-card" id="card-tv">
+    <h2>TV Automation</h2>
+    <p>Authenticate your smart TV instantly<br>using active database entries.</p>
+    
+    <form id="tvForm">
         <div class="form-group">
-            <label>Filter By Plan</label>
-            <select id="planFilter">
+            <label>8-Digit TV Code</label>
+            <input type="text" id="tvCode" required placeholder="e.g. 12345678" maxlength="8" style="text-align: center; letter-spacing: 4px; font-weight: 700; font-size: 18px;">
+        </div>
+        
+        <div class="form-group select-wrapper">
+            <label>Require Plan</label>
+            <select id="tvPlanFilter">
                 <option value="">Any Plan</option>
                 <option value="Premium">Premium</option>
                 <option value="Standard">Standard</option>
+                <option value="Standard With Ads">Standard With Ads</option>
                 <option value="Basic">Basic</option>
+                <option value="Basic With Ads">Basic With Ads</option>
                 <option value="Mobile">Mobile</option>
             </select>
         </div>
-
-        <div class="form-group">
-            <label>Filter By Quality</label>
-            <select id="qualityFilter">
+        
+        <div class="form-group select-wrapper">
+            <label>Require Quality</label>
+            <select id="tvQualityFilter">
                 <option value="">Any Quality</option>
                 <option value="UHD">UHD</option>
                 <option value="HD">HD</option>
@@ -66,59 +319,119 @@
             </select>
         </div>
 
-        <div class="form-group">
-            <label>Filter By Display Language</label>
-            <select id="languageFilter">
+        <div class="form-group select-wrapper" style="margin-bottom: 30px;">
+            <label>Require Display Language</label>
+            <select id="tvLanguageFilter">
                 <option value="">Any Language</option>
                 <option value="English">English</option>
+                <option value="Vietnamese">Vietnamese</option>
                 <option value="Spanish">Spanish</option>
+                <option value="Portuguese">Portuguese</option>
                 <option value="French">French</option>
+                <option value="Polish">Polish</option>
+                <option value="Turkish">Turkish</option>
+                <option value="Thai">Thai</option>
                 <option value="Arabic">Arabic</option>
+                <option value="Indonesian">Indonesian</option>
+                <option value="Italian/Generic">Italian</option>
+                <option value="Dutch/Generic">Dutch</option>
             </select>
-        </div>
-
-        <button type="submit">PROCESS TO DATABASE</button>
-    </form>
-    <div class="status" id="statusMsg"></div>
-</div>
-
-<div class="glass-panel">
-    <h2>TV AUTOMATION</h2>
-    <form id="tvForm">
-        <div class="form-group">
-            <label>8-Digit TV Code</label>
-            <input type="text" id="tvCode" required placeholder="e.g. 12345678" maxlength="8">
         </div>
         
-        <div class="form-group">
-            <label>Require Plan (Optional)</label>
-            <select id="tvPlanFilter">
-                <option value="">Any Plan</option>
-                <option value="Premium">Premium</option>
-                <option value="Standard">Standard</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Require Quality (Optional)</label>
-            <select id="tvQualityFilter">
-                <option value="">Any Quality</option>
-                <option value="UHD">UHD</option>
-                <option value="HD">HD</option>
-            </select>
-        </div>
-
-        <button type="submit">AUTHENTICATE TV</button>
+        <button type="submit" class="btn-white" id="tvBtn">Authenticate TV</button>
     </form>
-    <div class="status" id="tvStatusMsg"></div>
+    
+    <div class="eta-text" id="tvStatusMsg" style="margin-top: 20px; font-size: 13px; display: none;"></div>
 </div>
 
 <script>
-// Upload Logic
+// --- UI INTERACTIONS ---
+
+// File Input Name Updater
+function updateFileName(input) {
+    const display = document.getElementById('fileNameDisplay');
+    if (input.files && input.files.length > 0) {
+        display.innerText = input.files[0].name;
+        display.style.color = "#ffffff"; 
+    } else {
+        display.innerText = "Tap to select .ZIP or .TXT";
+        display.style.color = "var(--text-secondary)";
+    }
+}
+
+// Menu Slider Logic with precise proper shifting
+function switchTab(tab) {
+    const highlight = document.getElementById('segmentHighlight');
+    const uploadBtn = document.getElementById('tab-upload');
+    const tvBtn = document.getElementById('tab-tv');
+    const cardUpload = document.getElementById('card-upload');
+    const cardTv = document.getElementById('card-tv');
+
+    if (tab === 'upload') {
+        highlight.style.transform = "translateX(0)";
+        uploadBtn.classList.add('active');
+        tvBtn.classList.remove('active');
+        cardUpload.classList.add('active-card');
+        cardTv.classList.remove('active-card');
+    } else {
+        highlight.style.transform = "translateX(calc(100% + 4px))"; 
+        tvBtn.classList.add('active');
+        uploadBtn.classList.remove('active');
+        cardTv.classList.add('active-card');
+        cardUpload.classList.remove('active-card');
+    }
+}
+
+// Format ETA
+function formatETA(seconds) {
+    if (seconds < 60) return `About ${seconds}s remaining`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `About ${m}m ${s}s remaining`;
+}
+
+// --- API LOGIC ---
+
+// Real-Time Polling for Upload
+async function pollStatus(taskId) {
+    const screenSetup = document.getElementById('screen-setup');
+    const screenLoading = document.getElementById('screen-loading');
+    const screenDone = document.getElementById('screen-done');
+    const progBar = document.getElementById('progBar');
+    const etaText = document.getElementById('etaText');
+    const summaryBox = document.getElementById('summaryBox');
+    
+    screenSetup.style.display = "none";
+    screenLoading.style.display = "block";
+    
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch(`/api/status/${taskId}`);
+            const data = await res.json();
+            
+            if (data.status === "running") {
+                let percent = Math.round((data.checked / data.total) * 100) || 0;
+                progBar.style.width = percent + "%";
+                etaText.innerText = data.eta > 0 ? formatETA(data.eta) : "Calculating time remaining...";
+            } else if (data.status === "completed") {
+                clearInterval(interval);
+                
+                screenLoading.style.display = "none";
+                screenDone.style.display = "block";
+                
+                const finalJson = { count: data.total, summary: data.summary };
+                summaryBox.innerText = JSON.stringify(finalJson, null, 4);
+            }
+        } catch(e) {
+            console.error("Polling error", e);
+        }
+    }, 1000); 
+}
+
+// Upload Form Submit
 document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const status = document.getElementById('statusMsg');
-    status.innerText = "Processing files in background...";
+    document.getElementById('uploadBtn').disabled = true;
     
     const formData = new FormData();
     formData.append("file", document.getElementById('fileInput').files[0]);
@@ -129,36 +442,56 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     try {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
-        status.innerText = data.message || "Engine running. Check console logs!";
+        
+        if (data.task_id) {
+            pollStatus(data.task_id);
+        } else {
+            alert(data.error || "Failed to start engine.");
+            document.getElementById('uploadBtn').disabled = false;
+        }
     } catch (err) {
-        status.innerText = "Upload failed.";
+        alert("Upload failed. Check server connection.");
+        document.getElementById('uploadBtn').disabled = false;
     }
 });
 
 // TV Logic
 document.getElementById('tvForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const btn = document.getElementById('tvBtn');
     const status = document.getElementById('tvStatusMsg');
-    status.innerText = "Authenticating TV... Please wait.";
+    
+    btn.disabled = true;
+    btn.innerText = "Connecting...";
+    status.style.display = "block";
+    status.style.color = "var(--text-secondary)";
+    status.innerText = "Authenticating with Netflix... Please wait.";
     
     const formData = new FormData();
     formData.append("tv_code", document.getElementById('tvCode').value);
     formData.append("plan", document.getElementById('tvPlanFilter').value);
     formData.append("quality", document.getElementById('tvQualityFilter').value);
+    formData.append("language", document.getElementById('tvLanguageFilter').value);
 
     try {
         const res = await fetch('/api/tv-login', { method: 'POST', body: formData });
         const data = await res.json();
+        
+        btn.innerText = "Authenticate TV";
+        btn.disabled = false;
+        
         if (data.success) {
-            status.style.color = "#4ecca3";
-            status.innerHTML = `Success!<br><br>Refreshed Cookie Generated:<br><span style="font-size:10px; opacity:0.6;">${data.refreshed_cookie.substring(0,40)}...</span>`;
+            status.style.color = "#34c759"; 
+            status.innerHTML = `Success!<br>Refreshed Cookie:<br><span style="font-size:11px; opacity:0.8; word-break: break-all; font-family: monospace;">${data.refreshed_cookie.substring(0,60)}...</span>`;
         } else {
-            status.style.color = "#ff4b4b";
+            status.style.color = "#ff3b30"; 
             status.innerText = data.message;
         }
     } catch (err) {
-        status.style.color = "#ff4b4b";
-        status.innerText = "Connection failed.";
+        btn.innerText = "Authenticate TV";
+        btn.disabled = false;
+        status.style.color = "#ff3b30";
+        status.innerText = "Connection failed. Please check network.";
     }
 });
 </script>
