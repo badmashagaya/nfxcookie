@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OOR System Panel</title>
+    <style>
+        body {
+            margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: #fff; min-height: 100vh; display: flex; justify-content: center; align-items: center;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px; padding: 40px; width: 450px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+        h2 { margin-top: 0; font-weight: 400; letter-spacing: 2px; text-align: center; margin-bottom: 30px;}
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-size: 13px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;}
+        select, input[type="file"] {
+            width: 100%; padding: 14px; border-radius: 10px;
+            background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255,255,255,0.1);
+            color: white; outline: none; box-sizing: border-box; font-size: 15px;
+        }
+        option { background: #16213e; color: white;}
+        button {
+            width: 100%; padding: 16px; border-radius: 10px; margin-top: 10px;
+            background: rgba(255, 255, 255, 0.9); color: #1a1a2e; border: none;
+            font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s;
+        }
+        button:hover { background: #ffffff; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,255,255,0.2);}
+        .status { margin-top: 20px; font-size: 14px; text-align: center; color: #4ecca3; font-weight: bold;}
+    </style>
+</head>
+<body>
+
+<div class="glass-panel">
+    <h2>OOR DATABASE UPLOAD</h2>
+    <form id="uploadForm">
+        <div class="form-group">
+            <label>Upload Archive (.zip / .txt)</label>
+            <input type="file" id="fileInput" required>
+        </div>
+        
+        <div class="form-group">
+            <label>Filter By Plan</label>
+            <select id="planFilter">
+                <option value="">Any Plan</option>
+                <option value="Premium">Premium</option>
+                <option value="Standard">Standard</option>
+                <option value="Standard With Ads">Standard With Ads</option>
+                <option value="Basic">Basic</option>
+                <option value="Basic With Ads">Basic With Ads</option>
+                <option value="Mobile">Mobile</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Filter By Quality</label>
+            <select id="qualityFilter">
+                <option value="">Any Quality</option>
+                <option value="UHD">UHD</option>
+                <option value="HD">HD</option>
+                <option value="SD">SD</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Filter By Display Language</label>
+            <select id="languageFilter">
+                <option value="">Any Language</option>
+                <option value="English">English</option>
+                <option value="Vietnamese">Vietnamese</option>
+                <option value="Spanish">Spanish</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="French">French</option>
+                <option value="Polish">Polish</option>
+                <option value="Turkish">Turkish</option>
+                <option value="Thai">Thai</option>
+                <option value="Arabic">Arabic</option>
+                <option value="Indonesian">Indonesian</option>
+                <option value="Italian">Italian</option>
+                <option value="Dutch">Dutch</option>
+            </select>
+        </div>
+
+        <button type="submit">PROCESS TO DATABASE</button>
+    </form>
+    <div class="status" id="statusMsg"></div>
+</div>
+
+<script>
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const status = document.getElementById('statusMsg');
+    status.innerText = "Processing files in background...";
+    
+    const formData = new FormData();
+    formData.append("file", document.getElementById('fileInput').files[0]);
+    
+    const plan = document.getElementById('planFilter').value;
+    const quality = document.getElementById('qualityFilter').value;
+    const lang = document.getElementById('languageFilter').value;
+    
+    formData.append("req_plan", plan);
+    formData.append("req_quality", quality);
+    formData.append("req_language", lang);
+
+    try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        status.innerText = data.message || "Engine running. Check console logs!";
+    } catch (err) {
+        status.innerText = "Upload to API failed. Check server logs.";
+    }
+});
+</script>
+
+</body>
+</html>
