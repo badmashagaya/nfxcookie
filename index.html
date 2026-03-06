@@ -198,10 +198,9 @@
         .icon-wrapper {
             width: 60px; height: 60px; margin: 0 auto 20px auto;
             display: flex; justify-content: center; align-items: center;
+            color: #ffffff;
         }
         .icon-wrapper svg { width: 100%; height: 100%; }
-        .spin { animation: spin 1.5s linear infinite; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
 
         .progress-container {
             width: 100%; height: 6px; background: rgba(255,255,255,0.1); 
@@ -343,10 +342,31 @@
     </div>
 
     <div id="screen-loading">
-        <div class="icon-wrapper spin">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke-dasharray="2 2"/>
-                <path d="M12 8l-4 4h8l-4-4z" fill="#ffffff" stroke="none"/>
+        <div class="icon-wrapper">
+            <svg viewBox="-13 -13 45 45" xmlns="http://www.w3.org/2000/svg">
+                <style>
+                    .box5631 { transform-origin: 50% 50%; fill: currentColor; }
+                    @keyframes moveBox5631-1{9.09%{transform:translate(-12px,0)}18.18%{transform:translate(0,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(12px,0)}45.45%{transform:translate(12px,12px)}54.55%{transform:translate(12px,12px)}63.64%{transform:translate(12px,12px)}72.73%{transform:translate(12px,0)}81.82%{transform:translate(0,0)}90.91%{transform:translate(-12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(1){animation:moveBox5631-1 4s infinite}
+                    @keyframes moveBox5631-2{9.09%{transform:translate(0,0)}18.18%{transform:translate(12px,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(12px,0)}45.45%{transform:translate(12px,12px)}54.55%{transform:translate(12px,12px)}63.64%{transform:translate(12px,12px)}72.73%{transform:translate(12px,12px)}81.82%{transform:translate(0,12px)}90.91%{transform:translate(0,12px)}100%{transform:translate(0,0)}}.box5631:nth-child(2){animation:moveBox5631-2 4s infinite}
+                    @keyframes moveBox5631-3{9.09%{transform:translate(-12px,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(-12px,0)}45.45%{transform:translate(-12px,0)}54.55%{transform:translate(-12px,0)}63.64%{transform:translate(-12px,0)}72.73%{transform:translate(-12px,0)}81.82%{transform:translate(-12px,-12px)}90.91%{transform:translate(0,-12px)}100%{transform:translate(0,0)}}.box5631:nth-child(3){animation:moveBox5631-3 4s infinite}
+                    @keyframes moveBox5631-4{9.09%{transform:translate(-12px,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(-12px,-12px)}36.36%{transform:translate(0,-12px)}45.45%{transform:translate(0,0)}54.55%{transform:translate(0,-12px)}63.64%{transform:translate(0,-12px)}72.73%{transform:translate(0,-12px)}81.82%{transform:translate(-12px,-12px)}90.91%{transform:translate(-12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(4){animation:moveBox5631-4 4s infinite}
+                    @keyframes moveBox5631-5{9.09%{transform:translate(0,0)}18.18%{transform:translate(0,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(12px,0)}45.45%{transform:translate(12px,0)}54.55%{transform:translate(12px,0)}63.64%{transform:translate(12px,0)}72.73%{transform:translate(12px,0)}81.82%{transform:translate(12px,-12px)}90.91%{transform:translate(0,-12px)}100%{transform:translate(0,0)}}.box5631:nth-child(5){animation:moveBox5631-5 4s infinite}
+                    @keyframes moveBox5631-6{9.09%{transform:translate(0,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(-12px,0)}36.36%{transform:translate(0,0)}45.45%{transform:translate(0,0)}54.55%{transform:translate(0,0)}63.64%{transform:translate(0,0)}72.73%{transform:translate(0,12px)}81.82%{transform:translate(-12px,12px)}90.91%{transform:translate(-12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(6){animation:moveBox5631-6 4s infinite}
+                    @keyframes moveBox5631-7{9.09%{transform:translate(12px,0)}18.18%{transform:translate(12px,0)}27.27%{transform:translate(12px,0)}36.36%{transform:translate(0,0)}45.45%{transform:translate(0,-12px)}54.55%{transform:translate(12px,-12px)}63.64%{transform:translate(0,-12px)}72.73%{transform:translate(0,-12px)}81.82%{transform:translate(0,0)}90.91%{transform:translate(12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(7){animation:moveBox5631-7 4s infinite}
+                    @keyframes moveBox5631-8{9.09%{transform:translate(0,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(-12px,-12px)}36.36%{transform:translate(0,-12px)}45.45%{transform:translate(0,-12px)}54.55%{transform:translate(0,-12px)}63.64%{transform:translate(0,-12px)}72.73%{transform:translate(0,-12px)}81.82%{transform:translate(12px,-12px)}90.91%{transform:translate(12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(8){animation:moveBox5631-8 4s infinite}
+                    @keyframes moveBox5631-9{9.09%{transform:translate(-12px,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(-12px,0)}45.45%{transform:translate(0,0)}54.55%{transform:translate(0,0)}63.64%{transform:translate(-12px,0)}72.73%{transform:translate(-12px,0)}81.82%{transform:translate(-24px,0)}90.91%{transform:translate(-12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(9){animation:moveBox5631-9 4s infinite}
+                </style>
+                <g>
+                    <circle class="box5631" cx="13" cy="1" r="5"/>
+                    <circle class="box5631" cx="13" cy="1" r="5"/>
+                    <circle class="box5631" cx="25" cy="25" r="5"/>
+                    <circle class="box5631" cx="13" cy="13" r="5"/>
+                    <circle class="box5631" cx="13" cy="13" r="5"/>
+                    <circle class="box5631" cx="25" cy="13" r="5"/>
+                    <circle class="box5631" cx="1" cy="25" r="5"/>
+                    <circle class="box5631" cx="13" cy="25" r="5"/>
+                    <circle class="box5631" cx="25" cy="25" r="5"/>
+                </g>
             </svg>
         </div>
         
