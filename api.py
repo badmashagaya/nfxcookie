@@ -6,6 +6,7 @@ import pytz
 import uvicorn
 import threading
 from queue import Queue
+import random
 
 import core
 import database
@@ -102,10 +103,38 @@ def get_all_cookies(plan: Optional[str] = None, quality: Optional[str] = None, l
     return {"count": len(results), "data": results}
 
 
+
 @app.post("/api/tv-login")
-def tv_login(netflix_id: str = Form(...), tv_code: str = Form(...)):
-    success, msg = core.automate_tv_login(netflix_id, tv_code, PROXIES)
-    return {"success": success, "message": msg}
+def tv_login(
+    tv_code: str = Form(...),
+    netflix_id: Optional[str] = Form(None),
+    plan: Optional[str] = Form(None),
+    quality: Optional[str] = Form(None),
+    language: Optional[str] = Form(None)
+):
+    target_id = netflix_id
+    
+    # If the user didn't provide a specific NetflixId, search the DB using the filters
+    if not target_id:
+        available_cookies = database.get_filtered_cookies(plan, quality, language)
+        
+        if not available_cookies:
+            return {"success": False, "message": "No cookies found in the database matching those filters."}
+        
+        # Randomly select one cookie from the matching results
+        chosen_cookie = random.choice(available_cookies)
+        target_id = chosen_cookie["netflix_id"]
+
+    # Execute the automation
+    success, msg, refreshed_cookie = core.automate_tv_login(target_id, tv_code, PROXIES)
+    
+    return {
+        "success": success, 
+        "message": msg, 
+        "original_cookie_used": target_id,
+        "refreshed_cookie": refreshed_cookie
+    }
+
 
 
 @app.get("/", response_class=HTMLResponse)
