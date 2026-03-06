@@ -385,7 +385,7 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
         q.task_done()
 
 # ==========================================
-# --- DYNAMIC TV AUTOMATION ---
+# --- DYNAMIC TV AUTOMATION (WITH REFRESH) ---
 # ==========================================
 def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tuple:
     clean_id = netflix_id.replace("NetflixId=", "").strip()
@@ -411,14 +411,21 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
     proxy = random.choice(proxies) if proxies else None
 
     try:
+        # 1. This GET request forces Netflix to refresh the session cookies
         session.get("https://www.netflix.com/", proxies=proxy, timeout=15)
+        
+        # Extract the newly refreshed NetflixId provided by the server
+        refreshed_id = session.cookies.get("NetflixId") or clean_id
+        refreshed_cookie_string = f"NetflixId={refreshed_id}"
+
         res_tv8 = session.get("https://www.netflix.com/tv8", proxies=proxy, timeout=15)
         rc_obj = find_object_after_marker(res_tv8.text, "netflix.reactContext")
         rc_root = safe_load_json(rc_obj) if rc_obj else {}
         
         auth_url = get_path(rc_root, ["models", "signupContext", "data", "flow", "authURL"])
         
-        if not auth_url: return False, "Failed to extract dynamic authURL. Cookie might be dead."
+        if not auth_url: 
+            return False, "Failed to extract dynamic authURL. Cookie might be dead.", refreshed_cookie_string
 
         payload = {
             'flow': 'websiteSignUp', 'authURL': auth_url,
@@ -427,7 +434,11 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
         }
         res_tv2 = session.post("https://www.netflix.com/tv2", data=payload, proxies=proxy, timeout=15)
         
-        if "watch" in res_tv2.url or "browse" in res_tv2.url: return True, "Login successful!"
-        return False, f"Request sent, but did not redirect. Status: {res_tv2.status_code}"
+        # --- STRICT URL SUCCESS CHECK ---
+        if "tv/out/success" in res_tv2.url.lower(): 
+            return True, "Login successful!", refreshed_cookie_string
+            
+        return False, f"Failed. Final URL was: {res_tv2.url}", refreshed_cookie_string
     except Exception as e:
-        return False, f"Network Error: {str(e)}"
+        return False, f"Network Error: {str(e)}", netflix_id
+
