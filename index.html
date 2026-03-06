@@ -10,7 +10,6 @@
     </style>
 
     <style>
-        /* CSS Variables & Global Resets */
         :root {
             --bg-color: #000000;
             --card-bg: #06060c;
@@ -28,47 +27,90 @@
         }
 
         body {
-            margin: 0; padding: 40px 20px; 
+            margin: 0; 
+            padding: 40px 20px; 
             font-family: 'Nexa', sans-serif;
             font-weight: 300;
             background: var(--bg-color);
             color: var(--text-primary);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: flex-start;
             min-height: 100vh;
             -webkit-font-smoothing: antialiased;
         }
         
-        /* Apple-style Segmented Control (Slider) */
         .segmented-control {
-            display: flex; position: relative;
+            display: flex; 
+            position: relative;
             background: rgba(255, 255, 255, 0.08);
-            border-radius: 12px; padding: 4px; margin-bottom: 40px;
-            width: 320px;
+            border-radius: 12px; 
+            padding: 4px; 
+            margin-bottom: 40px;
+            width: 340px;
+            height: 44px;
+            align-items: stretch;
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 0 0 30px rgba(255,255,255,0.02), 0 4px 16px rgba(0,0,0,0.3);
         }
         .segment-btn {
-            flex: 1; text-align: center; padding: 10px 0;
-            font-size: 13px; font-weight: 700; color: var(--text-secondary);
-            cursor: pointer; z-index: 2; transition: color 0.3s ease;
+            flex: 1; 
+            font-size: 13px; 
+            font-weight: 700; 
+            color: var(--text-secondary);
+            cursor: pointer; 
+            z-index: 2; 
+            transition: color 0.3s ease;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
         }
         .segment-btn.active { color: var(--text-primary); }
         .segment-highlight {
-            position: absolute; top: 4px; left: 4px;
-            width: calc(50% - 4px); height: calc(100% - 8px);
-            background: #2c2c2e; border-radius: 8px;
+            position: absolute; 
+            top: 4px; bottom: 4px; left: 4px;
+            width: calc(50% - 4px);
+            background: #2c2c2e; 
+            border-radius: 8px;
             transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
-            z-index: 1; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 1; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
 
-        /* Card Container */
         .import-card {
             background: var(--card-bg);
             border-radius: 20px;
             padding: 40px 30px;
-            width: 100%; max-width: 340px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-            border: 1px solid rgba(255,255,255,0.05);
+            width: 100%; 
+            max-width: 340px;
+            border: none;
             display: none; 
             animation: fadeIn 0.4s ease forwards;
+            position: relative;
+            box-shadow: 
+                0 0 0 0.5px rgba(255,255,255,0.05),
+                0 0 40px rgba(255,255,255,0.02),
+                0 20px 40px rgba(0,0,0,0.5);
+        }
+        .import-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            padding: 1px;
+            background: linear-gradient(
+                170deg, 
+                rgba(255,255,255,0.12) 0%, 
+                rgba(255,255,255,0.03) 30%,
+                transparent 55%,
+                rgba(255,255,255,0.04) 80%,
+                rgba(255,255,255,0.09) 100%
+            );
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
         }
         .import-card.active-card { display: block; }
 
@@ -80,17 +122,18 @@
         h2 { margin: 0 0 10px 0; font-size: 20px; font-weight: 700; text-align: center; letter-spacing: 0.5px;}
         p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 30px 0; text-align: center;}
 
-        /* Custom File Dropzone */
         .file-upload-wrapper {
             position: relative;
             border: 1px dashed rgba(255,255,255,0.2);
             border-radius: 14px;
-            padding: 25px 20px;
-            text-align: center;
+            height: 120px;
             background: var(--input-bg);
             transition: all 0.3s ease;
             margin-bottom: 20px;
             cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         .file-upload-wrapper:hover {
             border-color: rgba(255,255,255,0.5);
@@ -102,19 +145,23 @@
             opacity: 0; cursor: pointer; z-index: 2;
         }
         .file-upload-content {
-            display: flex; flex-direction: column; align-items: center; pointer-events: none;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            gap: 12px;
+            pointer-events: none;
         }
         .file-upload-content img {
-            width: 45px; height: 45px; margin-bottom: 10px;
+            width: 42px; height: 42px;
         }
         .file-name-display {
             font-size: 13px; color: var(--text-secondary); font-weight: 700;
-            word-break: break-all;
+            word-break: break-all; text-align: center; padding: 0 10px;
         }
 
-        /* Form Inputs */
         .form-group { margin-bottom: 16px; position: relative; }
-        label { display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-secondary); font-weight: 700; padding-left: 2px;}
+        label { display: block; margin-bottom: 8px; font-size: 12px; color: var(--text-secondary); font-weight: 700; padding-left: 4px;}
         
         select, input[type="text"] {
             width: 100%; padding: 14px 16px; border-radius: 12px;
@@ -128,17 +175,16 @@
             background: rgba(255,255,255,0.08);
         }
         
-        /* Custom Arrow for Select */
         .select-wrapper::after {
-            content: ''; position: absolute; right: 16px; top: 50%;
-            transform: translateY(-50%); width: 12px; height: 12px;
+            content: ''; position: absolute; right: 16px; 
+            bottom: 19px;
+            width: 12px; height: 12px;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
             background-size: contain; background-repeat: no-repeat;
             pointer-events: none; opacity: 0.5;
         }
         option { background: #1c1c1e; color: white; font-weight: 300;}
 
-        /* Buttons */
         .btn-white {
             width: 100%; padding: 16px; border-radius: 14px; margin-top: 10px;
             background: #ffffff; color: #000000; border: none;
@@ -149,7 +195,6 @@
         .btn-white:active { transform: scale(0.96); }
         .btn-white:disabled { background: #333; color: #666; cursor: not-allowed; box-shadow: none; transform: none;}
 
-        /* Animated Icons */
         .icon-wrapper {
             width: 60px; height: 60px; margin: 0 auto 20px auto;
             display: flex; justify-content: center; align-items: center;
@@ -158,7 +203,6 @@
         .spin { animation: spin 1.5s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        /* Progress Bar */
         .progress-container {
             width: 100%; height: 6px; background: rgba(255,255,255,0.1); 
             border-radius: 6px; margin: 20px 0 10px 0; overflow: hidden;
@@ -170,7 +214,6 @@
         }
         .eta-text { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-align: center; margin-bottom: 30px; }
 
-        /* JSON Result Box */
         .json-summary {
             margin-top: 20px; padding: 16px; background: rgba(0,0,0,0.3); 
             border-radius: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; 
@@ -179,6 +222,55 @@
         }
 
         #screen-loading, #screen-done { display: none; }
+
+        @media (min-width: 768px) {
+            body {
+                justify-content: center;
+                padding: 60px 40px;
+            }
+
+            .segmented-control {
+                width: 440px;
+                height: 48px;
+                border-radius: 14px;
+                margin-bottom: 32px;
+            }
+
+            .segment-btn {
+                font-size: 14px;
+            }
+
+            .import-card {
+                max-width: 440px;
+                padding: 48px 40px;
+                border-radius: 24px;
+            }
+            .import-card::before {
+                border-radius: 24px;
+            }
+
+            h2 { font-size: 22px; }
+
+            .file-upload-wrapper {
+                height: 140px;
+                border-radius: 16px;
+            }
+
+            .file-upload-content img {
+                width: 48px; height: 48px;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .segmented-control {
+                width: 480px;
+            }
+
+            .import-card {
+                max-width: 480px;
+                padding: 52px 48px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -205,7 +297,7 @@
             </div>
             
             <div class="form-group select-wrapper">
-                <label>Require Plan</label>
+                <label>Plan</label>
                 <select id="planFilter">
                     <option value="">Any Plan</option>
                     <option value="Premium">Premium</option>
@@ -218,7 +310,7 @@
             </div>
             
             <div class="form-group select-wrapper">
-                <label>Require Quality</label>
+                <label>Quality</label>
                 <select id="qualityFilter">
                     <option value="">Any Quality</option>
                     <option value="UHD">UHD</option>
@@ -228,7 +320,7 @@
             </div>
             
             <div class="form-group select-wrapper" style="margin-bottom: 30px;">
-                <label>Require Display Language</label>
+                <label>Display Language</label>
                 <select id="languageFilter">
                     <option value="">Any Language</option>
                     <option value="English">English</option>
@@ -293,11 +385,11 @@
     <form id="tvForm">
         <div class="form-group">
             <label>8-Digit TV Code</label>
-            <input type="text" id="tvCode" required placeholder="e.g. 12345678" maxlength="8" style="text-align: center; letter-spacing: 4px; font-weight: 700; font-size: 18px;">
+            <input type="text" id="tvCode" required placeholder="e.g. 12345678" maxlength="8" style="text-align: center; letter-spacing: 4px; font-size: 18px;">
         </div>
         
         <div class="form-group select-wrapper">
-            <label>Require Plan</label>
+            <label>Plan</label>
             <select id="tvPlanFilter">
                 <option value="">Any Plan</option>
                 <option value="Premium">Premium</option>
@@ -310,7 +402,7 @@
         </div>
         
         <div class="form-group select-wrapper">
-            <label>Require Quality</label>
+            <label>Quality</label>
             <select id="tvQualityFilter">
                 <option value="">Any Quality</option>
                 <option value="UHD">UHD</option>
@@ -320,7 +412,7 @@
         </div>
 
         <div class="form-group select-wrapper" style="margin-bottom: 30px;">
-            <label>Require Display Language</label>
+            <label>Display Language</label>
             <select id="tvLanguageFilter">
                 <option value="">Any Language</option>
                 <option value="English">English</option>
@@ -345,9 +437,6 @@
 </div>
 
 <script>
-// --- UI INTERACTIONS ---
-
-// File Input Name Updater
 function updateFileName(input) {
     const display = document.getElementById('fileNameDisplay');
     if (input.files && input.files.length > 0) {
@@ -359,7 +448,6 @@ function updateFileName(input) {
     }
 }
 
-// Menu Slider Logic with precise proper shifting
 function switchTab(tab) {
     const highlight = document.getElementById('segmentHighlight');
     const uploadBtn = document.getElementById('tab-upload');
@@ -374,7 +462,7 @@ function switchTab(tab) {
         cardUpload.classList.add('active-card');
         cardTv.classList.remove('active-card');
     } else {
-        highlight.style.transform = "translateX(calc(100% + 4px))"; 
+        highlight.style.transform = "translateX(100%)"; 
         tvBtn.classList.add('active');
         uploadBtn.classList.remove('active');
         cardTv.classList.add('active-card');
@@ -382,7 +470,6 @@ function switchTab(tab) {
     }
 }
 
-// Format ETA
 function formatETA(seconds) {
     if (seconds < 60) return `About ${seconds}s remaining`;
     const m = Math.floor(seconds / 60);
@@ -390,9 +477,6 @@ function formatETA(seconds) {
     return `About ${m}m ${s}s remaining`;
 }
 
-// --- API LOGIC ---
-
-// Real-Time Polling for Upload
 async function pollStatus(taskId) {
     const screenSetup = document.getElementById('screen-setup');
     const screenLoading = document.getElementById('screen-loading');
@@ -428,7 +512,6 @@ async function pollStatus(taskId) {
     }, 1000); 
 }
 
-// Upload Form Submit
 document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     document.getElementById('uploadBtn').disabled = true;
@@ -455,7 +538,6 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     }
 });
 
-// TV Logic
 document.getElementById('tvForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('tvBtn');
