@@ -6,9 +6,9 @@
     <title>OOR System Panel</title>
     <style>
         body {
-            margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif;
+            margin: 0; padding: 40px; font-family: 'Segoe UI', sans-serif;
             background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-            color: #fff; min-height: 100vh; display: flex; justify-content: center; align-items: center;
+            color: #fff; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; gap: 40px; flex-wrap: wrap;
         }
         .glass-panel {
             background: rgba(255, 255, 255, 0.03);
@@ -20,7 +20,7 @@
         h2 { margin-top: 0; font-weight: 400; letter-spacing: 2px; text-align: center; margin-bottom: 30px;}
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-size: 13px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;}
-        select, input[type="file"] {
+        select, input[type="file"], input[type="text"] {
             width: 100%; padding: 14px; border-radius: 10px;
             background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255,255,255,0.1);
             color: white; outline: none; box-sizing: border-box; font-size: 15px;
@@ -32,7 +32,7 @@
             font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s;
         }
         button:hover { background: #ffffff; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255,255,255,0.2);}
-        .status { margin-top: 20px; font-size: 14px; text-align: center; color: #4ecca3; font-weight: bold;}
+        .status { margin-top: 20px; font-size: 14px; text-align: center; color: #4ecca3; font-weight: bold; word-break: break-all;}
     </style>
 </head>
 <body>
@@ -51,9 +51,7 @@
                 <option value="">Any Plan</option>
                 <option value="Premium">Premium</option>
                 <option value="Standard">Standard</option>
-                <option value="Standard With Ads">Standard With Ads</option>
                 <option value="Basic">Basic</option>
-                <option value="Basic With Ads">Basic With Ads</option>
                 <option value="Mobile">Mobile</option>
             </select>
         </div>
@@ -73,17 +71,9 @@
             <select id="languageFilter">
                 <option value="">Any Language</option>
                 <option value="English">English</option>
-                <option value="Vietnamese">Vietnamese</option>
                 <option value="Spanish">Spanish</option>
-                <option value="Portuguese">Portuguese</option>
                 <option value="French">French</option>
-                <option value="Polish">Polish</option>
-                <option value="Turkish">Turkish</option>
-                <option value="Thai">Thai</option>
                 <option value="Arabic">Arabic</option>
-                <option value="Indonesian">Indonesian</option>
-                <option value="Italian">Italian</option>
-                <option value="Dutch">Dutch</option>
             </select>
         </div>
 
@@ -92,7 +82,39 @@
     <div class="status" id="statusMsg"></div>
 </div>
 
+<div class="glass-panel">
+    <h2>TV AUTOMATION</h2>
+    <form id="tvForm">
+        <div class="form-group">
+            <label>8-Digit TV Code</label>
+            <input type="text" id="tvCode" required placeholder="e.g. 12345678" maxlength="8">
+        </div>
+        
+        <div class="form-group">
+            <label>Require Plan (Optional)</label>
+            <select id="tvPlanFilter">
+                <option value="">Any Plan</option>
+                <option value="Premium">Premium</option>
+                <option value="Standard">Standard</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Require Quality (Optional)</label>
+            <select id="tvQualityFilter">
+                <option value="">Any Quality</option>
+                <option value="UHD">UHD</option>
+                <option value="HD">HD</option>
+            </select>
+        </div>
+
+        <button type="submit">AUTHENTICATE TV</button>
+    </form>
+    <div class="status" id="tvStatusMsg"></div>
+</div>
+
 <script>
+// Upload Logic
 document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const status = document.getElementById('statusMsg');
@@ -100,21 +122,43 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     
     const formData = new FormData();
     formData.append("file", document.getElementById('fileInput').files[0]);
-    
-    const plan = document.getElementById('planFilter').value;
-    const quality = document.getElementById('qualityFilter').value;
-    const lang = document.getElementById('languageFilter').value;
-    
-    formData.append("req_plan", plan);
-    formData.append("req_quality", quality);
-    formData.append("req_language", lang);
+    formData.append("req_plan", document.getElementById('planFilter').value);
+    formData.append("req_quality", document.getElementById('qualityFilter').value);
+    formData.append("req_language", document.getElementById('languageFilter').value);
 
     try {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
         status.innerText = data.message || "Engine running. Check console logs!";
     } catch (err) {
-        status.innerText = "Upload to API failed. Check server logs.";
+        status.innerText = "Upload failed.";
+    }
+});
+
+// TV Logic
+document.getElementById('tvForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const status = document.getElementById('tvStatusMsg');
+    status.innerText = "Authenticating TV... Please wait.";
+    
+    const formData = new FormData();
+    formData.append("tv_code", document.getElementById('tvCode').value);
+    formData.append("plan", document.getElementById('tvPlanFilter').value);
+    formData.append("quality", document.getElementById('tvQualityFilter').value);
+
+    try {
+        const res = await fetch('/api/tv-login', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            status.style.color = "#4ecca3";
+            status.innerHTML = `Success!<br><br>Refreshed Cookie Generated:<br><span style="font-size:10px; opacity:0.6;">${data.refreshed_cookie.substring(0,40)}...</span>`;
+        } else {
+            status.style.color = "#ff4b4b";
+            status.innerText = data.message;
+        }
+    } catch (err) {
+        status.style.color = "#ff4b4b";
+        status.innerText = "Connection failed.";
     }
 });
 </script>
