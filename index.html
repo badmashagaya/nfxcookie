@@ -44,15 +44,37 @@
         .segmented-control {
             display: flex; 
             position: relative;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 12px; 
+            background: var(--card-bg);
+            border-radius: 14px; 
             padding: 4px; 
             margin-bottom: 40px;
             width: 340px;
             height: 44px;
             align-items: stretch;
-            border: 1px solid rgba(255,255,255,0.06);
-            box-shadow: 0 0 30px rgba(255,255,255,0.02), 0 4px 16px rgba(0,0,0,0.3);
+            border: none;
+            box-shadow: 
+                0 0 0 0.5px rgba(255,255,255,0.05),
+                0 0 30px rgba(255,255,255,0.02),
+                0 4px 16px rgba(0,0,0,0.3);
+        }
+        .segmented-control::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            padding: 1px;
+            background: linear-gradient(
+                170deg, 
+                rgba(255,255,255,0.12) 0%, 
+                rgba(255,255,255,0.03) 30%,
+                transparent 55%,
+                rgba(255,255,255,0.04) 80%,
+                rgba(255,255,255,0.09) 100%
+            );
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
         }
         .segment-btn {
             flex: 1; 
@@ -71,11 +93,12 @@
             position: absolute; 
             top: 4px; bottom: 4px; left: 4px;
             width: calc(50% - 4px);
-            background: #2c2c2e; 
-            border-radius: 8px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 10px;
             transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
             z-index: 1; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.06);
         }
 
         .import-card {
@@ -222,6 +245,18 @@
 
         #screen-loading, #screen-done { display: none; }
 
+        .site-footer {
+            margin-top: 0;
+            padding-top: 30px;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            text-align: center;
+            opacity: 0.7;
+            letter-spacing: 0.2px;
+        }
+
         @media (min-width: 768px) {
             body {
                 justify-content: center;
@@ -231,7 +266,6 @@
             .segmented-control {
                 width: 440px;
                 height: 48px;
-                border-radius: 14px;
                 margin-bottom: 32px;
             }
 
@@ -456,7 +490,11 @@
     <div class="eta-text" id="tvStatusMsg" style="margin-top: 20px; font-size: 13px; display: none;"></div>
 </div>
 
+<div class="site-footer" id="siteFooter"></div>
+
 <script>
+document.getElementById('siteFooter').textContent = '\u00A9 ' + new Date().getFullYear() + ' OORverse. All rights reserved.';
+
 function updateFileName(input) {
     const display = document.getElementById('fileNameDisplay');
     if (input.files && input.files.length > 0) {
