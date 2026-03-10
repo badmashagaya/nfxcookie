@@ -257,6 +257,49 @@
             letter-spacing: 0.2px;
         }
 
+        /* ========================================== */
+        /* NEW: MODAL OVERLAY STYLES                  */
+        /* ========================================== */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            display: none; justify-content: center; align-items: center;
+            z-index: 1000; opacity: 0; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        
+        .modal-box {
+            background: var(--card-bg);
+            border-radius: 20px; padding: 40px 30px; 
+            width: 100%; max-width: 340px;
+            box-shadow: 0 0 0 0.5px rgba(255,255,255,0.05), 0 20px 40px rgba(0,0,0,0.5);
+            border: none; position: relative; text-align: center;
+            transform: scale(0.95); transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .modal-box::before {
+            content: ''; position: absolute; inset: 0; border-radius: 20px; padding: 1px;
+            background: linear-gradient(170deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 30%, transparent 55%, rgba(255,255,255,0.04) 80%, rgba(255,255,255,0.09) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+        }
+        .modal-overlay.active .modal-box { transform: scale(1); }
+        
+        .modal-close {
+            position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; width: 32px; height: 32px;
+            color: white; cursor: pointer; display: flex; justify-content: center; align-items: center;
+            z-index: 10; transition: background 0.2s; padding: 0; outline: none;
+        }
+        .modal-close:hover { background: rgba(255,255,255,0.15); }
+        
+        .modal-cookie-box {
+            margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.3); 
+            border-radius: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; 
+            font-size: 11px; color: var(--text-secondary); word-break: break-all; text-align: left;
+            border: 1px solid var(--border); max-height: 100px; overflow-y: auto; display: none;
+        }
+
         @media (min-width: 768px) {
             body {
                 justify-content: center;
@@ -486,11 +529,52 @@
         
         <button type="submit" class="btn-white" id="tvBtn">Authenticate TV</button>
     </form>
-    
-    <div class="eta-text" id="tvStatusMsg" style="margin-top: 20px; font-size: 13px; display: none;"></div>
 </div>
 
 <div class="site-footer" id="siteFooter"></div>
+
+<div class="modal-overlay" id="tvModal">
+    <div class="modal-box">
+        <button class="modal-close" id="modalCloseBtn" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        
+        <div class="icon-wrapper spin" id="modalIconSpin">
+            <svg viewBox="-13 -13 45 45" xmlns="http://www.w3.org/2000/svg">
+                <style>
+                    .box5631 { transform-origin: 50% 50%; fill: currentColor; }
+                    @keyframes moveBox5631-1{9.09%{transform:translate(-12px,0)}18.18%{transform:translate(0,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(12px,0)}45.45%{transform:translate(12px,12px)}54.55%{transform:translate(12px,12px)}63.64%{transform:translate(12px,12px)}72.73%{transform:translate(12px,0)}81.82%{transform:translate(0,0)}90.91%{transform:translate(-12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(1){animation:moveBox5631-1 4s infinite}
+                    @keyframes moveBox5631-2{9.09%{transform:translate(0,0)}18.18%{transform:translate(12px,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(12px,0)}45.45%{transform:translate(12px,12px)}54.55%{transform:translate(12px,12px)}63.64%{transform:translate(12px,12px)}72.73%{transform:translate(12px,12px)}81.82%{transform:translate(0,12px)}90.91%{transform:translate(0,12px)}100%{transform:translate(0,0)}}.box5631:nth-child(2){animation:moveBox5631-2 4s infinite}
+                    @keyframes moveBox5631-3{9.09%{transform:translate(-12px,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(-12px,0)}45.45%{transform:translate(-12px,0)}54.55%{transform:translate(-12px,0)}63.64%{transform:translate(-12px,0)}72.73%{transform:translate(-12px,0)}81.82%{transform:translate(-12px,-12px)}90.91%{transform:translate(0,-12px)}100%{transform:translate(0,0)}}.box5631:nth-child(3){animation:moveBox5631-3 4s infinite}
+                    @keyframes moveBox5631-4{9.09%{transform:translate(-12px,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(-12px,-12px)}36.36%{transform:translate(0,-12px)}45.45%{transform:translate(0,0)}54.55%{transform:translate(0,-12px)}63.64%{transform:translate(0,-12px)}72.73%{transform:translate(0,-12px)}81.82%{transform:translate(-12px,-12px)}90.91%{transform:translate(-12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(4){animation:moveBox5631-4 4s infinite}
+                    @keyframes moveBox5631-5{9.09%{transform:translate(0,0)}18.18%{transform:translate(0,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(12px,0)}45.45%{transform:translate(12px,0)}54.55%{transform:translate(12px,0)}63.64%{transform:translate(12px,0)}72.73%{transform:translate(12px,0)}81.82%{transform:translate(12px,-12px)}90.91%{transform:translate(0,-12px)}100%{transform:translate(0,0)}}.box5631:nth-child(5){animation:moveBox5631-5 4s infinite}
+                    @keyframes moveBox5631-6{9.09%{transform:translate(0,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(-12px,0)}36.36%{transform:translate(0,0)}45.45%{transform:translate(0,0)}54.55%{transform:translate(0,0)}63.64%{transform:translate(0,0)}72.73%{transform:translate(0,12px)}81.82%{transform:translate(-12px,12px)}90.91%{transform:translate(-12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(6){animation:moveBox5631-6 4s infinite}
+                    @keyframes moveBox5631-7{9.09%{transform:translate(12px,0)}18.18%{transform:translate(12px,0)}27.27%{transform:translate(12px,0)}36.36%{transform:translate(0,0)}45.45%{transform:translate(0,-12px)}54.55%{transform:translate(12px,-12px)}63.64%{transform:translate(0,-12px)}72.73%{transform:translate(0,-12px)}81.82%{transform:translate(0,0)}90.91%{transform:translate(12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(7){animation:moveBox5631-7 4s infinite}
+                    @keyframes moveBox5631-8{9.09%{transform:translate(0,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(-12px,-12px)}36.36%{transform:translate(0,-12px)}45.45%{transform:translate(0,-12px)}54.55%{transform:translate(0,-12px)}63.64%{transform:translate(0,-12px)}72.73%{transform:translate(0,-12px)}81.82%{transform:translate(12px,-12px)}90.91%{transform:translate(12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(8){animation:moveBox5631-8 4s infinite}
+                    @keyframes moveBox5631-9{9.09%{transform:translate(-12px,0)}18.18%{transform:translate(-12px,0)}27.27%{transform:translate(0,0)}36.36%{transform:translate(-12px,0)}45.45%{transform:translate(0,0)}54.55%{transform:translate(0,0)}63.64%{transform:translate(-12px,0)}72.73%{transform:translate(-12px,0)}81.82%{transform:translate(-24px,0)}90.91%{transform:translate(-12px,0)}100%{transform:translate(0,0)}}.box5631:nth-child(9){animation:moveBox5631-9 4s infinite}
+                </style>
+                <g>
+                    <circle class="box5631" cx="13" cy="1" r="5"/>
+                    <circle class="box5631" cx="13" cy="1" r="5"/>
+                    <circle class="box5631" cx="25" cy="25" r="5"/>
+                    <circle class="box5631" cx="13" cy="13" r="5"/>
+                    <circle class="box5631" cx="13" cy="13" r="5"/>
+                    <circle class="box5631" cx="25" cy="13" r="5"/>
+                    <circle class="box5631" cx="1" cy="25" r="5"/>
+                    <circle class="box5631" cx="13" cy="25" r="5"/>
+                    <circle class="box5631" cx="25" cy="25" r="5"/>
+                </g>
+            </svg>
+        </div>
+        
+        <div class="icon-wrapper" id="modalIconStatic" style="display: none;"></div>
+        
+        <h2 id="modalTitle">Connecting...</h2>
+        <p id="modalDesc">Authenticating with Netflix...<br>Please wait.</p>
+        
+        <div class="modal-cookie-box" id="modalCookieBox"></div>
+    </div>
+</div>
 
 <script>
 document.getElementById('siteFooter').textContent = '\u00A9 ' + new Date().getFullYear() + ' OORverse. All rights reserved.';
@@ -596,16 +680,42 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     }
 });
 
+// --- Modal Logic ---
+const tvModal = document.getElementById('tvModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalDesc = document.getElementById('modalDesc');
+const modalIconSpin = document.getElementById('modalIconSpin');
+const modalIconStatic = document.getElementById('modalIconStatic');
+const modalCookieBox = document.getElementById('modalCookieBox');
+const modalCloseBtn = document.getElementById('modalCloseBtn');
+
+function openModal() {
+    tvModal.style.display = 'flex';
+    setTimeout(() => tvModal.classList.add('active'), 10);
+    
+    modalTitle.innerText = "Connecting...";
+    modalDesc.innerHTML = "Authenticating with Netflix...<br>Please wait.";
+    modalTitle.style.color = "#ffffff";
+    
+    modalIconSpin.style.display = "flex";
+    modalIconStatic.style.display = "none";
+    modalCookieBox.style.display = "none";
+    modalCloseBtn.style.display = "none";
+}
+
+function closeModal() {
+    tvModal.classList.remove('active');
+    setTimeout(() => tvModal.style.display = 'none', 300);
+}
+
+modalCloseBtn.addEventListener('click', closeModal);
+
 document.getElementById('tvForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('tvBtn');
-    const status = document.getElementById('tvStatusMsg');
-    
     btn.disabled = true;
-    btn.innerText = "Connecting...";
-    status.style.display = "block";
-    status.style.color = "var(--text-secondary)";
-    status.innerText = "Authenticating with Netflix... Please wait.";
+    
+    openModal();
     
     const formData = new FormData();
     formData.append("tv_code", document.getElementById('tvCode').value);
@@ -617,21 +727,37 @@ document.getElementById('tvForm').addEventListener('submit', async (e) => {
         const res = await fetch('/api/tv-login', { method: 'POST', body: formData });
         const data = await res.json();
         
-        btn.innerText = "Authenticate TV";
         btn.disabled = false;
+        modalIconSpin.style.display = "none";
+        modalIconStatic.style.display = "flex";
+        modalCloseBtn.style.display = "flex";
         
         if (data.success) {
-            status.style.color = "#34c759"; 
-            status.innerHTML = `Success!<br>Refreshed Cookie:<br><span style="font-size:11px; opacity:0.8; word-break: break-all; font-family: monospace;">${data.refreshed_cookie.substring(0,60)}...</span>`;
+            modalIconStatic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>`;
+            modalTitle.innerText = "Success!";
+            modalTitle.style.color = "#34c759";
+            modalDesc.innerText = "Your TV is ready to watch.";
+            
+            if (data.refreshed_cookie) {
+                modalCookieBox.style.display = "block";
+                modalCookieBox.innerText = "Refreshed Cookie:\n\n" + data.refreshed_cookie;
+            }
         } else {
-            status.style.color = "#ff3b30"; 
-            status.innerText = data.message;
+            modalIconStatic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+            modalTitle.innerText = "Failed";
+            modalTitle.style.color = "#ff3b30";
+            modalDesc.innerText = data.message;
         }
     } catch (err) {
-        btn.innerText = "Authenticate TV";
         btn.disabled = false;
-        status.style.color = "#ff3b30";
-        status.innerText = "Connection failed. Please check network.";
+        modalIconSpin.style.display = "none";
+        modalIconStatic.style.display = "flex";
+        modalCloseBtn.style.display = "flex";
+        
+        modalIconStatic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+        modalTitle.innerText = "Connection Error";
+        modalTitle.style.color = "#ff3b30";
+        modalDesc.innerText = "Please check your network and try again.";
     }
 });
 </script>
