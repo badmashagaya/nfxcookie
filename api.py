@@ -164,9 +164,38 @@ def get_all_cookies(plan: Optional[str] = None, quality: Optional[str] = None, l
     return {"count": len(results), "data": results}
 
 @app.post("/api/tv-login")
-def tv_login(netflix_id: str = Form(...), tv_code: str = Form(...)):
-    success, msg = core.automate_tv_login(netflix_id, tv_code, PROXIES)
-    return {"success": success, "message": msg}
+def tv_login(
+    tv_code: str = Form(...),
+    plan: Optional[str] = Form(""),
+    quality: Optional[str] = Form(""),
+    language: Optional[str] = Form("")
+):
+    import random
+    
+    # 1. Search DB for cookies matching your filters
+    available_cookies = database.get_filtered_cookies(plan, quality, language)
+    
+    if not available_cookies:
+        return {"success": False, "message": "No cookies found matching those filters."}
+        
+    # 2. Pick one randomly to prevent burning out accounts
+    chosen_cookie = random.choice(available_cookies)
+    target_id = chosen_cookie["netflix_id"]
+
+    # 3. Authenticate using your new deep-search core.py logic
+    result = core.automate_tv_login(target_id, tv_code, PROXIES)
+    
+    # Handle the returned tuple safely
+    success = result[0]
+    msg = result[1]
+    refreshed = result[2] if len(result) > 2 else target_id
+    
+    return {
+        "success": success, 
+        "message": msg,
+        "refreshed_cookie": refreshed
+    }
+
 
 @app.get("/", response_class=HTMLResponse)
 def serve_ui():
