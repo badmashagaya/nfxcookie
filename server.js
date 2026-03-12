@@ -32,6 +32,13 @@ app.use('/admin', createProxyMiddleware({
 }));
 
 
+// 4. The Documentation Route (NEW)
+// This makes the pretty /oordocs URL work instantly
+app.get('/oordocs', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'docs.html'));
+});
+
+// Catch-all: Route everything else back to index.html (Handles React/Vue style routing if needed)
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
