@@ -33,13 +33,11 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
         
         role_color = "#34c759" if role == "OWNER" else "#0088ff"
         
-        # Math for progress bar
         percentage = min((usage / limit * 100), 100) if limit > 0 else 0
-        bar_color = "#34c759" # Green
-        if percentage >= 90: bar_color = "#ff9f0a" # Orange
-        if percentage >= 100: bar_color = "#ff3b30" # Red
+        bar_color = "#34c759" 
+        if percentage >= 90: bar_color = "#ff9f0a" 
+        if percentage >= 100: bar_color = "#ff3b30" 
         
-        # Generate Alerts
         if percentage >= 90 and role != "OWNER":
             alerts_html += f"<div class='alert-box'>⚠️ Reseller <b>{domain}</b> is at {int(percentage)}% of their {period} quota.</div>"
         
@@ -47,25 +45,23 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
         
         key_cards_html += f"""
         <div class="key-card">
-            <div class="key-info">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span class="key-role" style="color: {role_color};">{role}</span>
-                    <span class="key-domain">{domain}</span>
+            <div class="key-header">
+                <span class="key-role" style="color: {role_color};">{role}</span>
+                <span class="key-domain">{domain}</span>
+            </div>
+            <div class="key-string">{key_str}</div>
+            
+            <div class="quota-section">
+                <div class="quota-text">
+                    <span>Usage: {usage} / {limit_display}</span>
+                    <span>{int(percentage)}%</span>
                 </div>
-                <span class="key-string">{key_str}</span>
-                
-                <div class="quota-section">
-                    <div style="display:flex; justify-content:space-between; font-size:11px; color:#8e8e99; margin-bottom:4px;">
-                        <span>Usage: {usage} / {limit_display}</span>
-                        <span>{int(percentage)}%</span>
-                    </div>
-                    <div class="progress-bg">
-                        <div class="progress-fill" style="width: {percentage}%; background: {bar_color};"></div>
-                    </div>
+                <div class="progress-bg">
+                    <div class="progress-fill" style="width: {percentage}%; background: {bar_color};"></div>
                 </div>
             </div>
             
-            <form action="/admin/delete" method="POST" style="margin:0; width:100%;">
+            <form action="/admin/delete" method="POST" style="margin-top:15px; width:100%;">
                 <input type="hidden" name="api_key" value="{key_str}">
                 <button type="submit" class="btn-revoke">Revoke Access</button>
             </form>
@@ -80,10 +76,10 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
         @import url('https://fonts.cdnfonts.com/css/nexa-bold');
         :root { --bg-color: #000000; --card-bg: #06060c; --text-primary: #ffffff; --text-secondary: #8e8e99; --border: rgba(255, 255, 255, 0.1); --input-bg: rgba(255, 255, 255, 0.05); }
         * { -webkit-tap-highlight-color: transparent; outline: none; box-sizing: border-box; }
-        body { margin: 0; padding: 40px 20px; font-family: 'Nexa', sans-serif; font-weight: 300; background: var(--bg-color); color: var(--text-primary); display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        body { margin: 0; padding: 20px; font-family: 'Nexa', sans-serif; font-weight: 300; background: var(--bg-color); color: var(--text-primary); display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         
         .import-card {
-            background: var(--card-bg); border-radius: 20px; padding: 40px 30px; width: 100%; max-width: 480px; position: relative; margin-bottom: 30px;
+            background: var(--card-bg); border-radius: 20px; padding: 30px 20px; width: 100%; max-width: 500px; position: relative; margin-bottom: 30px;
             box-shadow: 0 0 0 0.5px rgba(255,255,255,0.05), 0 20px 40px rgba(0,0,0,0.5);
         }
         .import-card::before {
@@ -91,35 +87,44 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
             background: linear-gradient(170deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 30%, transparent 55%, rgba(255,255,255,0.04) 80%, rgba(255,255,255,0.09) 100%);
             -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
         }
-        h2 { margin: 0 0 10px 0; font-size: 20px; font-weight: 700; text-align: center; letter-spacing: 0.5px;}
-        p { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 30px 0; text-align: center;}
+        h2 { margin: 0 0 10px 0; font-size: 22px; font-weight: 700; text-align: center; letter-spacing: 0.5px;}
+        p { font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 30px 0; text-align: center;}
         
-        .form-row { display: flex; gap: 15px; margin-bottom: 16px; }
-        .form-group { flex: 1; position: relative; }
-        label { display: block; margin-bottom: 8px; font-size: 12px; color: var(--text-secondary); font-weight: 700; padding-left: 4px;}
+        .form-row { display: flex; flex-direction: column; gap: 15px; margin-bottom: 16px; }
+        .form-group { width: 100%; position: relative; margin-bottom: 16px;}
+        label { display: block; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); font-weight: 700; padding-left: 4px;}
+        
         select, input[type="text"], input[type="number"] { width: 100%; height: 50px; padding: 0 16px; border-radius: 12px; background: var(--input-bg); border: 1px solid var(--border); color: white; font-size: 14px; font-weight: 700; font-family: 'Nexa', sans-serif; transition: 0.2s; appearance: none; -webkit-appearance: none; }
         select:focus, input:focus { border-color: rgb(0, 136, 255); background: rgba(255,255,255,0.08); }
         .select-wrapper::after { content: ''; position: absolute; right: 16px; bottom: 19px; width: 12px; height: 12px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-size: contain; background-repeat: no-repeat; pointer-events: none; opacity: 0.5; }
         option { background: #1c1c1e; color: white; font-weight: 300;}
         
-        .btn-white { width: 100%; height: 54px; border-radius: 14px; margin-top: 10px; background: #ffffff; color: #000000; border: none; font-size: 15px; font-weight: 700; font-family: 'Nexa', sans-serif; cursor: pointer; transition: transform 0.1s ease, opacity 0.2s; box-shadow: 0 4px 14px rgba(255,255,255,0.1); }
+        .btn-white { width: 100%; height: 54px; border-radius: 14px; margin-top: 10px; background: #ffffff; color: #000000; border: none; font-size: 15px; font-weight: 700; font-family: 'Nexa', sans-serif; cursor: pointer; transition: transform 0.1s ease, opacity 0.2s; }
         .btn-white:active { transform: scale(0.96); }
 
-        .key-card { background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 16px; transition: border-color 0.2s; }
-        .key-card:hover { border-color: rgba(255,255,255,0.3); }
-        .key-info { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-        .key-role { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
-        .key-string { font-family: ui-monospace, monospace; font-size: 13px; color: var(--text-primary); background: rgba(0,0,0,0.5); padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);}
-        .key-domain { font-size: 11px; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px;}
+        /* Mobile Friendly Key Cards */
+        .key-card { background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; display: flex; flex-direction: column; transition: border-color 0.2s; }
+        .key-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;}
+        .key-role { font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+        .key-domain { font-size: 11px; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 8px;}
+        .key-string { font-family: ui-monospace, monospace; font-size: 13px; color: var(--text-primary); background: rgba(0,0,0,0.5); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); word-break: break-all; margin-bottom: 16px;}
         
-        .quota-section { margin-top: 8px; }
-        .progress-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; }
-        .progress-fill { height: 100%; border-radius: 6px; transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1); }
+        .quota-section { width: 100%; }
+        .quota-text { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; font-weight: 700;}
+        .progress-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 8px; transition: width 0.5s ease; }
 
-        .btn-revoke { width: 100%; background: rgba(255, 59, 48, 0.1); color: #ff3b30; border: 1px solid rgba(255, 59, 48, 0.2); padding: 12px; border-radius: 10px; font-weight: 700; font-family: 'Nexa', sans-serif; cursor: pointer; font-size: 13px; transition: 0.2s; }
+        .btn-revoke { width: 100%; background: rgba(255, 59, 48, 0.1); color: #ff3b30; border: 1px solid rgba(255, 59, 48, 0.2); padding: 14px; border-radius: 10px; font-weight: 700; font-family: 'Nexa', sans-serif; cursor: pointer; font-size: 14px; transition: 0.2s; }
         .btn-revoke:hover { background: #ff3b30; color: #fff; }
         
-        .alert-box { background: rgba(255, 159, 10, 0.1); border: 1px solid rgba(255, 159, 10, 0.3); color: #ff9f0a; padding: 12px 16px; border-radius: 10px; font-size: 12px; margin-bottom: 20px; font-weight: 700; }
+        .alert-box { background: rgba(255, 159, 10, 0.1); border: 1px solid rgba(255, 159, 10, 0.3); color: #ff9f0a; padding: 16px; border-radius: 12px; font-size: 13px; margin-bottom: 25px; font-weight: 700; line-height: 1.5; }
+
+        /* Desktop Adjustments */
+        @media (min-width: 600px) {
+            body { padding: 40px; }
+            .import-card { padding: 40px; }
+            .form-row { flex-direction: row; }
+        }
     </style>
     """
 
@@ -174,7 +179,7 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
         </div>
 
         <div class="import-card">
-            <h2 style="font-size: 16px; text-align: left; margin-bottom: 20px;">Active API Keys & Usage</h2>
+            <h2 style="font-size: 18px; text-align: left; margin-bottom: 25px;">Active API Keys</h2>
             {key_cards_html}
         </div>
     </body>
