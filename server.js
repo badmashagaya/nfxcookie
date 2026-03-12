@@ -13,14 +13,25 @@ const OWNER_API_KEY = process.env.OWNER_API_KEY || 'OTTONRENT';
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 2. The Secure Proxy Interceptor
-// When index.html calls "/api/upload", this server catches it, 
-// secretly attaches your API key, and forwards it to the Python API.
+// When index.html calls "/api/...", this server catches it.
 app.use('/api', createProxyMiddleware({
     target: PYTHON_API_URL,
     changeOrigin: true,
     onProxyReq: (proxyReq, req, res) => {
-        // The browser never sees this happen!
-        proxyReq.setHeader('X-API-Key', OWNER_API_KEY);
+        
+        // RULE 1: If a Reseller or curl already provided an API Key, leave it alone!
+        if (req.headers['x-api-key']) {
+            return; 
+        }
+
+        // RULE 2: If NO key is provided, check if the request is coming from YOUR own website UI
+        const origin = req.headers.origin || req.headers.referer || '';
+        const host = req.headers.host || '';
+        
+        // If the origin matches your Render app's host, safely inject the Owner Key
+        if (origin.includes(host)) {
+            proxyReq.setHeader('X-API-Key', OWNER_API_KEY);
+        }
     }
 }));
 
@@ -31,8 +42,7 @@ app.use('/admin', createProxyMiddleware({
     changeOrigin: true
 }));
 
-
-// 4. The Documentation Route (NEW)
+// 4. The Documentation Route
 // This makes the pretty /oordocs URL work instantly
 app.get('/oordocs', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'docs.html'));
