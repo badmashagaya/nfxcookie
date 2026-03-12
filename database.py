@@ -64,25 +64,56 @@ def delete_cookie(nid: str):
             r.delete(f"cookie:{nid}")
     except: pass
     
-# --- API KEY MANAGEMENT ---
-def create_api_key(api_key: str, role: str, domain: str):
+# --- API KEY & QUOTA MANAGEMENT ---
+import datetime
+import pytz
+
+def create_api_key(api_key: str, role: str, domain: str, quota_limit: int, quota_period: str):
     r.hset(f"apikey:{api_key}", mapping={
         "role": role, 
-        "domain": domain.rstrip('/') # Remove trailing slashes for exact matching
+        "domain": domain.rstrip('/'),
+        "quota_limit": quota_limit,
+        "quota_period": quota_period,
+        "created_at": datetime.datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%Y-%m-%d %H:%M')
     })
 
 def get_api_key(api_key: str):
     return r.hgetall(f"apikey:{api_key}")
+
+def get_usage(api_key: str, period: str):
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.datetime.now(ist)
+    if period == 'daily': suffix = now.strftime('%Y-%m-%d')
+    elif period == 'monthly': suffix = now.strftime('%Y-%m')
+    elif period == 'yearly': suffix = now.strftime('%Y')
+    else: suffix = 'lifetime'
+    
+    val = r.get(f"usage:{api_key}:{suffix}")
+    return int(val) if val else 0
+
+def increment_quota(api_key: str, period: str):
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.datetime.now(ist)
+    if period == 'daily': suffix = now.strftime('%Y-%m-%d'); ttl = 86400
+    elif period == 'monthly': suffix = now.strftime('%Y-%m'); ttl = 2592000
+    elif period == 'yearly': suffix = now.strftime('%Y'); ttl = 31536000
+    else: suffix = 'lifetime'; ttl = None
+    
+    key = f"usage:{api_key}:{suffix}"
+    new_val = r.incr(key)
+    if new_val == 1 and ttl: r.expire(key, ttl)
+    return new_val
 
 def get_all_keys():
     keys = r.keys("apikey:*")
     result = []
     for k in keys:
         data = r.hgetall(k)
-        data['key'] = k.replace("apikey:", "")
+        raw_key = k.replace("apikey:", "")
+        data['key'] = raw_key
+        data['current_usage'] = get_usage(raw_key, data.get('quota_period', 'lifetime'))
         result.append(data)
     return result
 
 def delete_api_key(api_key: str):
     r.delete(f"apikey:{api_key}")
-        
