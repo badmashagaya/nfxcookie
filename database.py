@@ -64,4 +64,25 @@ def delete_cookie(nid: str):
             r.delete(f"cookie:{nid}")
     except: pass
     
+# --- API KEY MANAGEMENT ---
+def create_api_key(api_key: str, role: str, domain: str):
+    r.hset(f"apikey:{api_key}", mapping={
+        "role": role, 
+        "domain": domain.rstrip('/') # Remove trailing slashes for exact matching
+    })
 
+def get_api_key(api_key: str):
+    return r.hgetall(f"apikey:{api_key}")
+
+def get_all_keys():
+    keys = r.keys("apikey:*")
+    result = []
+    for k in keys:
+        data = r.hgetall(k)
+        data['key'] = k.replace("apikey:", "")
+        result.append(data)
+    return result
+
+def delete_api_key(api_key: str):
+    r.delete(f"apikey:{api_key}")
+        
