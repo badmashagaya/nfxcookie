@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OOR API Documentation</title>
+    
+    <style>
+        @import url('https://fonts.cdnfonts.com/css/nexa-bold');
+    </style>
+
+    <style>
+        :root {
+            --bg-color: #000000;
+            --card-bg: #06060c;
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e99;
+            --accent: rgb(0, 136, 255);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { -webkit-tap-highlight-color: transparent; outline: none; box-sizing: border-box; }
+
+        body {
+            margin: 0; padding: 40px 20px; 
+            font-family: 'Nexa', sans-serif; font-weight: 300;
+            background: var(--bg-color); color: var(--text-primary);
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; -webkit-font-smoothing: antialiased;
+        }
+
+        .import-card {
+            background: var(--card-bg); border-radius: 20px; padding: 40px;
+            width: 100%; max-width: 800px; position: relative;
+            box-shadow: 0 0 0 0.5px rgba(255,255,255,0.05), 0 20px 40px rgba(0,0,0,0.5);
+            margin-bottom: 40px;
+        }
+        .import-card::before {
+            content: ''; position: absolute; inset: 0; border-radius: 20px; padding: 1px;
+            background: linear-gradient(170deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 30%, transparent 55%, rgba(255,255,255,0.04) 80%, rgba(255,255,255,0.09) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+        }
+
+        h2 { margin: 0 0 10px 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
+        h3 { font-size: 16px; font-weight: 700; margin: 35px 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 20px 0; }
+
+        .endpoint-box {
+            display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 25px;
+        }
+        .badge { background: rgba(0, 136, 255, 0.2); color: var(--accent); padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+        .endpoint-url { font-family: ui-monospace, monospace; font-size: 14px; color: #fff; }
+
+        .alert-box {
+            background: rgba(52, 199, 89, 0.1); border: 1px solid rgba(52, 199, 89, 0.3);
+            color: #34c759; padding: 16px; border-radius: 12px; font-size: 13px; font-weight: 700; margin-bottom: 25px;
+        }
+        .alert-box.warning { background: rgba(255, 159, 10, 0.1); border-color: rgba(255, 159, 10, 0.3); color: #ff9f0a; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13px; }
+        th { text-align: left; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); font-weight: 700; }
+        td { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; }
+        td code { background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 12px; color: var(--accent); }
+
+        /* Code Blocks */
+        .code-wrapper { position: relative; background: #0a0a0f; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 25px; overflow: hidden; }
+        .code-header { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+        .copy-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); color: white; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-family: 'Nexa', sans-serif; cursor: pointer; transition: 0.2s; font-weight: 700; }
+        .copy-btn:hover { background: rgba(255,255,255,0.2); }
+        pre { margin: 0; padding: 16px; overflow-x: auto; font-family: ui-monospace, monospace; font-size: 13px; color: #34c759; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+<div class="import-card">
+    <h2>OOR API Documentation</h2>
+    <p>Welcome to the Reseller Integration Guide. Use this API to authenticate Smart TVs directly from your own website.</p>
+
+    <div class="alert-box">
+        💡 <b>Fair Quota System:</b> Your quota points are <u>only deducted on a successful login.</u> If a user enters a wrong code or an account is dead, you do not lose any points!
+    </div>
+
+    <div class="alert-box warning">
+        ⚠️ <b>Security Notice:</b> Never expose your API key in frontend JavaScript or HTML. You must make API requests from your own backend server (Node.js, PHP, Python, etc.) to keep your key hidden.
+    </div>
+
+    <h3>Authentication Endpoint</h3>
+    <div class="endpoint-box">
+        <span class="badge">POST</span>
+        <span class="endpoint-url">/api/tv-login</span>
+    </div>
+
+    <h3>Required Headers</h3>
+    <table>
+        <tr><th>Header</th><th>Required</th><th>Description</th></tr>
+        <tr><td><code>X-API-Key</code></td><td><span style="color:#34c759; font-weight:700;">YES</span></td><td>Your secret Reseller API Key.</td></tr>
+        <tr><td><code>Origin</code></td><td><span style="color:#34c759; font-weight:700;">YES</span></td><td>The domain authorized for your key (e.g., <i>https://your-website.com</i>). Automatically sent by browsers, but must be set manually if calling from a backend proxy.</td></tr>
+    </table>
+
+    <h3>Form Data Parameters</h3>
+    <p>Data must be sent as <code>multipart/form-data</code> or <code>application/x-www-form-urlencoded</code>.</p>
+    <table>
+        <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
+        <tr><td><code>tv_code</code></td><td><span style="color:#34c759; font-weight:700;">YES</span></td><td>The 8-digit TV code from the screen.</td></tr>
+        <tr><td><code>plan</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by plan (e.g., "Premium", "Standard").</td></tr>
+        <tr><td><code>quality</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by quality (e.g., "UHD", "HD").</td></tr>
+        <tr><td><code>language</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by language (e.g., "English", "Spanish").</td></tr>
+    </table>
+
+    <h3>Integration Examples</h3>
+
+    <div class="code-wrapper">
+        <div class="code-header">
+            <span>PHP (Easiest Backend Method)</span>
+            <button class="copy-btn" onclick="copyCode(this, 'code-php')">Copy</button>
+        </div>
+        <pre id="code-php"><code>&lt;?php
+// Save this as tv-login.php on your server
+$api_key = "oor_YOUR_API_KEY";
+$api_url = "https://YOUR_API_DOMAIN/api/tv-login";
+$your_domain = "https://your-website.com"; // Must match your authorized domain
+
+$postData = [
+    'tv_code'  => $_POST['tv_code'] ?? '',
+    'plan'     => $_POST['plan'] ?? '',       // Optional
+    'quality'  => $_POST['quality'] ?? '',    // Optional
+    'language' => $_POST['language'] ?? ''    // Optional
+];
+
+$ch = curl_init($api_url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "X-API-Key: " . $api_key,
+    "Origin: " . $your_domain
+]);
+
+$response = curl_exec($ch);
+curl_close($ch);
+
+header('Content-Type: application/json');
+echo $response;
+?&gt;</code></pre>
+    </div>
+
+    <div class="code-wrapper">
+        <div class="code-header">
+            <span>Node.js / Express (Using Axios)</span>
+            <button class="copy-btn" onclick="copyCode(this, 'code-node')">Copy</button>
+        </div>
+        <pre id="code-node"><code>const axios = require('axios');
+const FormData = require('form-data');
+
+app.post('/my-tv-login', async (req, res) => {
+    const form = new FormData();
+    form.append('tv_code', req.body.tv_code);
+    if (req.body.plan) form.append('plan', req.body.plan);
+
+    try {
+        const response = await axios.post('https://YOUR_API_DOMAIN/api/tv-login', form, {
+            headers: {
+                ...form.getHeaders(),
+                'X-API-Key': 'oor_YOUR_API_KEY',
+                'Origin': 'https://your-website.com'
+            }
+        });
+        res.json(response.data);
+    } catch (error) {
+        res.status(error.response?.status || 500).json(error.response?.data);
+    }
+});</code></pre>
+    </div>
+
+    <div class="code-wrapper">
+        <div class="code-header">
+            <span>Python (Requests)</span>
+            <button class="copy-btn" onclick="copyCode(this, 'code-py')">Copy</button>
+        </div>
+        <pre id="code-py"><code>import requests
+
+url = "https://YOUR_API_DOMAIN/api/tv-login"
+payload = {
+    "tv_code": "12345678",
+    "plan": "Premium",
+    "quality": "UHD"
+}
+headers = {
+    "X-API-Key": "oor_YOUR_API_KEY",
+    "Origin": "https://your-website.com"
+}
+
+response = requests.post(url, data=payload, headers=headers)
+print(response.json())</code></pre>
+    </div>
+
+</div>
+
+<script>
+function copyCode(btn, elementId) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text);
+    const originalText = btn.innerText;
+    btn.innerText = "Copied!";
+    btn.style.color = "#34c759";
+    setTimeout(() => {
+        btn.innerText = originalText;
+        btn.style.color = "white";
+    }, 2000);
+}
+</script>
+
+</body>
+</html>
