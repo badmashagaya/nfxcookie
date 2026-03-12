@@ -1,5 +1,7 @@
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from typing import Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
@@ -11,11 +13,52 @@ import time
 
 import core
 import database
+from admin import admin_router # Imports your secure key-generation dashboard
 
 app = FastAPI(title="OOR Full System")
-PROXIES = core.load_proxies()
 
+# --- 1. SECURITY: BROWSER CORS ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount the /admin dashboard to your API
+app.include_router(admin_router)
+
+PROXIES = core.load_proxies()
 upload_tasks = {}
+
+# --- 2. SECURITY: THE VAULT INTERCEPTOR ---
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+def verify_security(request: Request, api_key: str = Depends(api_key_header)):
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Missing X-API-Key header")
+        
+    key_data = database.get_api_key(api_key)
+    if not key_data:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+
+    # Owner bypasses all restrictions
+    if key_data.get("role") == "owner":
+        return key_data
+
+    # Reseller domain verification
+    origin = request.headers.get("origin")
+    allowed_domain = key_data.get("domain", "")
+
+    if not origin:
+        raise HTTPException(status_code=403, detail="Requests must include an Origin header matching the allowed domain.")
+        
+    if origin.rstrip('/') != allowed_domain.rstrip('/'):
+        raise HTTPException(status_code=403, detail=f"Unauthorized domain. This key is locked to {allowed_domain}")
+
+    return key_data
+
 
 # --- BACKGROUND AUTO-SCANNER ---
 def revalidate_db_task():
@@ -54,14 +97,20 @@ scheduler.start()
 
 
 # --- API ENDPOINTS ---
+
+# Upload is restricted to Owner Only
 @app.post("/api/upload")
 async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     req_plan: str = Form(""),
     req_quality: str = Form(""),
-    req_language: str = Form("")
+    req_language: str = Form(""),
+    key_data: dict = Depends(verify_security) # <--- Security Added
 ):
+    if key_data.get("role") != "owner":
+        return JSONResponse(status_code=403, content={"error": "Only the Owner can upload to the database."})
+
     contents = await file.read()
     filename = getattr(file, "filename", "") or "" 
     extracted_ids = core.extract_ids_from_bytes(contents, filename)
@@ -99,8 +148,6 @@ async def upload_file(
         threads = []
         
         # --- SMART THREADING ALGORITHM ---
-        # Adjusts dynamically based on load to prevent Netflix blocks
-        # Minimum 3 threads, Maximum 50 threads.
         num_cookies = len(id_list)
         if num_cookies <= 20:
             num_threads = min(3, num_cookies)
@@ -139,9 +186,12 @@ async def upload_file(
     background_tasks.add_task(run_nfx_and_store)
     return {"task_id": task_id, "message": "Engine Started."}
 
-
+# Status checks are restricted to Owner Only
 @app.get("/api/status/{task_id}")
-def get_task_status(task_id: str):
+def get_task_status(task_id: str, key_data: dict = Depends(verify_security)):
+    if key_data.get("role") != "owner":
+        return JSONResponse(status_code=403, content={"error": "Unauthorized"})
+
     if task_id not in upload_tasks:
         return JSONResponse(content={"error": "Task not found"}, status_code=404)
         
@@ -150,7 +200,7 @@ def get_task_status(task_id: str):
     # --- ETA CALCULATION ---
     if task_data["status"] == "running" and task_data["checked"] > 0:
         elapsed = time.time() - task_data["start_time"]
-        rate = elapsed / task_data["checked"] # seconds per cookie
+        rate = elapsed / task_data["checked"] 
         remaining = task_data["total"] - task_data["checked"]
         task_data["eta"] = max(0, int(rate * remaining))
         
@@ -159,30 +209,41 @@ def get_task_status(task_id: str):
 
 @app.get("/api/cookies")
 @app.get("/api/cookie")
-def get_all_cookies(plan: Optional[str] = None, quality: Optional[str] = None, language: Optional[str] = None):
+def get_all_cookies(
+    plan: Optional[str] = None, 
+    quality: Optional[str] = None, 
+    language: Optional[str] = None,
+    key_data: dict = Depends(verify_security) # <--- Security Added
+):
+    if key_data.get("role") != "owner":
+        return JSONResponse(status_code=403, content={"error": "Unauthorized"})
+
     results = database.get_filtered_cookies(plan, quality, language)
     return {"count": len(results), "data": results}
 
+
+# TV Login is accessible to Owner AND Authorized Resellers
 @app.post("/api/tv-login")
 def tv_login(
     tv_code: str = Form(...),
     plan: Optional[str] = Form(""),
     quality: Optional[str] = Form(""),
-    language: Optional[str] = Form("")
+    language: Optional[str] = Form(""),
+    key_data: dict = Depends(verify_security) # <--- Security Added
 ):
     import random
     
-    # 1. Search DB for cookies matching your filters
+    # 1. Search DB for cookies matching filters
     available_cookies = database.get_filtered_cookies(plan, quality, language)
     
     if not available_cookies:
-        return {"success": False, "message": "No cookies found matching those filters."}
+        return {"success": False, "message": "No active accounts currently match those exact specifications. Please alter your filters."}
         
-    # 2. Pick one randomly to prevent burning out accounts
+    # 2. Pick one randomly
     chosen_cookie = random.choice(available_cookies)
     target_id = chosen_cookie["netflix_id"]
 
-    # 3. Authenticate using your new deep-search core.py logic
+    # 3. Authenticate using your new deep-search logic
     result = core.automate_tv_login(target_id, tv_code, PROXIES)
     
     # Handle the returned tuple safely
