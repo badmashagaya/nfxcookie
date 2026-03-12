@@ -24,6 +24,14 @@ app.use('/api', createProxyMiddleware({
     }
 }));
 
+// 3. The Secure Admin Proxy
+// Forwards /admin requests from Render to your VPS Admin Dashboard
+app.use('/admin', createProxyMiddleware({
+    target: PYTHON_API_URL,
+    changeOrigin: true
+}));
+
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
