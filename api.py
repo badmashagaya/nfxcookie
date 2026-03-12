@@ -42,10 +42,9 @@ def verify_security(request: Request, api_key: str = Depends(api_key_header)):
     if not key_data:
         raise HTTPException(status_code=401, detail="Invalid API Key")
 
-    # Inject the key so the route knows which one to deduct from later
     key_data['api_key'] = api_key
 
-    # --- QUOTA CHECK (Verification Only, NO DEDUCTION YET) ---
+    # --- QUOTA CHECK ---
     quota_limit = int(key_data.get("quota_limit", 0))
     quota_period = key_data.get("quota_period", "lifetime")
     
@@ -54,11 +53,9 @@ def verify_security(request: Request, api_key: str = Depends(api_key_header)):
         if current_usage >= quota_limit:
             raise HTTPException(status_code=429, detail=f"Quota Exceeded. Limit of {quota_limit} requests ({quota_period}) reached.")
 
-    # Owner bypasses domain restrictions
     if key_data.get("role") == "owner":
         return key_data
 
-    # Reseller domain verification
     origin = request.headers.get("origin")
     allowed_domain = key_data.get("domain", "")
 
@@ -73,7 +70,6 @@ def verify_security(request: Request, api_key: str = Depends(api_key_header)):
 
 # --- BACKGROUND AUTO-SCANNER ---
 def revalidate_db_task():
-    print("[*] Starting Scheduled DB Revalidation...")
     try:
         all_ids = database.r.smembers("all_hits")
         if not all_ids: return
@@ -87,8 +83,7 @@ def revalidate_db_task():
     guid_lock = threading.Lock()
     processed_guids = set()
     
-    def db_cleanup_hook(data):
-        pass 
+    def db_cleanup_hook(data): pass 
 
     threads = []
     db_threads = min(20, max(5, len(all_ids) // 10))
@@ -98,7 +93,6 @@ def revalidate_db_task():
         t.start()
         threads.append(t)
     q.join()
-    print("[*] Database revalidation finished.")
 
 ist_tz = pytz.timezone('Asia/Kolkata')
 scheduler = BackgroundScheduler(timezone=ist_tz)
@@ -128,13 +122,11 @@ async def upload_file(
 
     id_list = list(extracted_ids)
     task_id = str(uuid.uuid4())
-    
     upload_tasks[task_id] = {"status": "running", "total": len(id_list), "checked": 0, "summary": None, "start_time": time.time(), "eta": 0}
 
     def run_nfx_and_store():
         q = Queue()
         for nid in id_list: q.put(nid)
-        
         stats = {"hits": 0, "free": 0, "holds": 0, "dead": 0, "errors": 0, "unknown": 0, "duplicates": 0, "qualities": {}, "plans": {}}
         print_lock = threading.Lock()
         guid_lock = threading.Lock()
@@ -165,7 +157,6 @@ async def upload_file(
 
         q.join()
         local_ip, proxy_status = core.get_public_ip(PROXIES)
-        
         upload_tasks[task_id]["checked"] = num_cookies
         upload_tasks[task_id]["status"] = "completed"
         upload_tasks[task_id]["eta"] = 0
@@ -198,7 +189,6 @@ def get_all_cookies(plan: Optional[str] = None, quality: Optional[str] = None, l
     return {"count": len(results), "data": results}
 
 
-# TV Login is accessible to Owner AND Authorized Resellers
 @app.post("/api/tv-login")
 def tv_login(
     tv_code: str = Form(...),
@@ -208,7 +198,6 @@ def tv_login(
     key_data: dict = Depends(verify_security) 
 ):
     import random
-    
     available_cookies = database.get_filtered_cookies(plan, quality, language)
     
     if not available_cookies:
@@ -223,7 +212,7 @@ def tv_login(
     msg = result[1]
     refreshed = result[2] if len(result) > 2 else target_id
     
-    # --- DEDUCT QUOTA ONLY ON SUCCESS ---
+    # Deduct quota ONLY on success
     if success:
         database.increment_quota(key_data['api_key'], key_data.get('quota_period', 'lifetime'))
     
@@ -232,16 +221,6 @@ def tv_login(
         "message": msg,
         "refreshed_cookie": refreshed
     }
-
-# --- UI PAGES ---
-@app.get("/", response_class=HTMLResponse)
-def serve_ui():
-    with open("index.html", "r", encoding="utf-8") as f: return f.read()
-
-# Documentation Page
-@app.get("/oordocs", response_class=HTMLResponse)
-def serve_docs():
-    with open("docs.html", "r", encoding="utf-8") as f: return f.read()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
