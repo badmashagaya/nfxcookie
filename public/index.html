@@ -648,16 +648,22 @@ async function pollStatus(taskId) {
             const res = await fetch(`/api/status/${taskId}`);
             const data = await res.json();
             
+            // Fix: Catch FastAPI Security Errors during polling
+            if (data.detail) {
+                clearInterval(interval);
+                alert("Security Error: " + data.detail);
+                window.location.reload();
+                return;
+            }
+            
             if (data.status === "running") {
                 let percent = Math.round((data.checked / data.total) * 100) || 0;
                 progBar.style.width = percent + "%";
                 etaText.innerText = data.eta > 0 ? formatETA(data.eta) : "Calculating time remaining...";
             } else if (data.status === "completed") {
                 clearInterval(interval);
-                
                 screenLoading.style.display = "none";
                 screenDone.style.display = "block";
-                
                 const finalJson = { count: data.total, summary: data.summary };
                 summaryBox.innerText = JSON.stringify(finalJson, null, 4);
             }
@@ -684,7 +690,9 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
         if (data.task_id) {
             pollStatus(data.task_id);
         } else {
-            alert(data.error || "Failed to start engine.");
+            // Fix: Catch detail or message
+            const errorMsg = data.detail || data.error || "Failed to start engine.";
+            alert("Error: " + errorMsg);
             document.getElementById('uploadBtn').disabled = false;
         }
     } catch (err) {
@@ -745,7 +753,8 @@ document.getElementById('tvForm').addEventListener('submit', async (e) => {
         modalIconStatic.style.display = "flex";
         modalCloseBtn.style.display = "flex";
         
-        if (data.success) {
+        // Check for success == true
+        if (data.success === true) {
             modalIconStatic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>`;
             modalTitle.innerText = "Success!";
             modalTitle.style.color = "#34c759";
@@ -756,10 +765,13 @@ document.getElementById('tvForm').addEventListener('submit', async (e) => {
                 modalCookieBox.innerText = "Refreshed Cookie:\n\n" + data.refreshed_cookie;
             }
         } else {
+            // FIX: Gracefully catch FastAPI 401/403/422 "detail" errors AND our custom "message" errors
+            const errorText = data.detail || data.message || "An unknown error occurred.";
+            
             modalIconStatic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
             modalTitle.innerText = "Failed";
             modalTitle.style.color = "#ff3b30";
-            modalDesc.innerText = data.message;
+            modalDesc.innerText = errorText;
         }
     } catch (err) {
         btn.disabled = false;
@@ -774,6 +786,7 @@ document.getElementById('tvForm').addEventListener('submit', async (e) => {
     }
 });
 </script>
+    
 
 </body>
 </html>
