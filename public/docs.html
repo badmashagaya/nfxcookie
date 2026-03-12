@@ -20,7 +20,7 @@
         * { -webkit-tap-highlight-color: transparent; outline: none; box-sizing: border-box; }
 
         body {
-            margin: 0; padding: 40px 20px; 
+            margin: 0; padding: 20px 10px; 
             font-family: 'Nexa', sans-serif; font-weight: 300;
             background: var(--bg-color); color: var(--text-primary);
             display: flex; flex-direction: column; align-items: center;
@@ -28,7 +28,7 @@
         }
 
         .import-card {
-            background: var(--card-bg); border-radius: 20px; padding: 40px 30px;
+            background: var(--card-bg); border-radius: 20px; padding: 25px 15px;
             width: 100%; max-width: 800px; position: relative;
             box-shadow: 0 0 0 0.5px rgba(255,255,255,0.05), 0 20px 40px rgba(0,0,0,0.5);
             margin-bottom: 40px;
@@ -40,45 +40,51 @@
             -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
         }
 
-        h2 { margin: 0 0 15px 0; font-size: 26px; font-weight: 700; letter-spacing: 0.5px; }
-        h3 { font-size: 18px; font-weight: 700; margin: 50px 0 20px 0; padding-bottom: 12px; border-bottom: 1px solid var(--border); color: #fff;}
-        p { font-size: 15px; color: var(--text-secondary); line-height: 1.8; margin: 0 0 25px 0; }
+        h2 { margin: 0 0 10px 0; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; text-align: center;}
+        h3 { font-size: 16px; font-weight: 700; margin: 30px 0 15px 0; padding-bottom: 10px; border-bottom: 1px solid var(--border); color: #fff;}
+        p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 20px 0; text-align: center;}
 
         .endpoint-box {
-            display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.03);
-            border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 35px;
-            flex-wrap: wrap;
+            display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 25px;
+            flex-wrap: wrap; justify-content: center;
         }
-        .badge { background: rgba(0, 136, 255, 0.2); color: var(--accent); padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
-        .endpoint-url { font-family: ui-monospace, monospace; font-size: 15px; color: #fff; word-break: break-all;}
+        .badge { background: rgba(0, 136, 255, 0.2); color: var(--accent); padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+        .endpoint-url { font-family: ui-monospace, monospace; font-size: 12px; color: #fff; word-break: break-all;}
 
         .alert-box {
             background: rgba(52, 199, 89, 0.1); border: 1px solid rgba(52, 199, 89, 0.3);
-            color: #34c759; padding: 20px; border-radius: 14px; font-size: 14px; font-weight: 700; margin-bottom: 30px; line-height: 1.6;
+            color: #34c759; padding: 15px; border-radius: 12px; font-size: 12px; font-weight: 700; margin-bottom: 25px; line-height: 1.5;
         }
         .alert-box.warning { background: rgba(255, 159, 10, 0.1); border-color: rgba(255, 159, 10, 0.3); color: #ff9f0a; }
 
         /* Table */
-        .table-container { overflow-x: auto; margin-bottom: 40px; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px;}
-        th { text-align: left; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); font-weight: 700; }
-        td { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; line-height: 1.6;}
-        td code { background: rgba(255,255,255,0.1); padding: 6px 10px; border-radius: 8px; font-family: ui-monospace, monospace; font-size: 13px; color: var(--accent); }
+        .table-container { overflow-x: auto; margin-bottom: 30px; border-radius: 8px;}
+        table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px;}
+        th { text-align: left; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); font-weight: 700; }
+        td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #fff; line-height: 1.5;}
+        td code { background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 11px; color: var(--accent); }
 
         /* Code Blocks */
-        .code-wrapper { position: relative; background: #0a0a0f; border: 1px solid var(--border); border-radius: 14px; margin-bottom: 35px; overflow: hidden; }
-        .code-header { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 700; color: var(--text-secondary); }
-        .copy-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); color: white; padding: 8px 16px; border-radius: 8px; font-size: 12px; font-family: 'Nexa', sans-serif; cursor: pointer; transition: 0.2s; font-weight: 700; }
+        .code-wrapper { position: relative; background: #0a0a0f; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 25px; overflow: hidden; }
+        .code-header { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 10px 15px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+        .copy-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05); color: white; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-family: 'Nexa', sans-serif; cursor: pointer; transition: 0.2s; font-weight: 700; }
         .copy-btn:hover { background: rgba(255,255,255,0.2); }
-        pre { margin: 0; padding: 24px; overflow-x: auto; font-family: ui-monospace, monospace; font-size: 14px; color: #34c759; line-height: 1.6; }
+        pre { margin: 0; padding: 15px; overflow-x: auto; font-family: ui-monospace, monospace; font-size: 12px; color: #34c759; line-height: 1.5; }
         
-        /* Highlighting inside code blocks */
         .c-comment { color: #8e8e99; }
         .c-string { color: #ff9f0a; }
 
-        @media (min-width: 768px) {
-            body { padding: 60px 40px; }
-            .import-card { padding: 50px 60px; }
+        @media (min-width: 600px) {
+            body { padding: 40px; }
+            .import-card { padding: 40px; }
+            h2 { font-size: 24px; text-align: left;}
+            p { font-size: 14px; text-align: left;}
+            h3 { font-size: 18px; }
+            .endpoint-box { justify-content: flex-start; padding: 16px;}
+            .endpoint-url { font-size: 14px; }
+            td, th { padding: 16px; font-size: 13px;}
+            pre { padding: 20px; font-size: 13px; }
         }
     </style>
 </head>
@@ -93,11 +99,10 @@
     </div>
 
     <div class="alert-box warning">
-        ⚠️ <b>Security Notice:</b> Never expose your API key in frontend HTML or JavaScript. You must make API requests from your own backend server to keep your key completely hidden.
+        ⚠️ <b>Security Notice:</b> Never expose your API key in frontend HTML or JavaScript. You must make API requests from your own backend server.
     </div>
 
     <h3>Authentication Endpoint</h3>
-    <p>Send your requests to this URL.</p>
     <div class="endpoint-box">
         <span class="badge">POST</span>
         <span class="endpoint-url">https://your-api-domain.com/api/tv-login</span>
@@ -108,59 +113,54 @@
         <table>
             <tr><th>Header</th><th>Required</th><th>Description</th></tr>
             <tr><td><code>X-API-Key</code></td><td><span style="color:#34c759; font-weight:700;">YES</span></td><td>Your secret Reseller API Key.</td></tr>
-            <tr><td><code>Origin</code></td><td><span style="color:#34c759; font-weight:700;">YES</span></td><td>The domain authorized for your key (e.g., <i>https://your-website.com</i>). This proves the request is coming from your server.</td></tr>
+            <tr><td><code>Origin</code></td><td><span style="color:#34c759; font-weight:700;">YES</span></td><td>The domain authorized for your key (e.g., <i>https://your-site.com</i>).</td></tr>
         </table>
     </div>
 
     <h3>Form Data Parameters</h3>
-    <p>Data must be sent as <code>multipart/form-data</code>. Do not send raw JSON bodies.</p>
+    <p style="text-align: left;">Data must be sent as <code>multipart/form-data</code>.</p>
     <div class="table-container">
         <table>
             <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
-            <tr><td><code>tv_code</code></td><td><span style="color:#34c759; font-weight:700;">YES</span></td><td>The 8-digit TV code from the screen.</td></tr>
-            <tr><td><code>plan</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by plan (e.g., "Premium", "Standard"). Leave blank to ignore.</td></tr>
-            <tr><td><code>quality</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by quality (e.g., "UHD", "HD"). Leave blank to ignore.</td></tr>
-            <tr><td><code>language</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by language (e.g., "English"). Leave blank to ignore.</td></tr>
+            <tr><td><code>tv_code</code></td><td><span style="color:#34c759; font-weight:700;">YES</span></td><td>The 8-digit TV code.</td></tr>
+            <tr><td><code>plan</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by plan (e.g., "Premium").</td></tr>
+            <tr><td><code>quality</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by quality (e.g., "UHD").</td></tr>
+            <tr><td><code>language</code></td><td><span style="color:#8e8e99; font-weight:700;">NO</span></td><td>Filter by language (e.g., "English").</td></tr>
         </table>
     </div>
 
     <h3>Integration Examples</h3>
-    <p>Below are clear, copy-paste examples of how to build your backend endpoint. Your website's frontend will call your own backend, and your backend will securely forward the request to OOR.</p>
+    <p style="text-align: left;">Below are clear examples of how to build your backend endpoint.</p>
 
     <div class="code-wrapper">
         <div class="code-header">
-            <span>Node.js (Using built-in Native Fetch)</span>
-            <button class="copy-btn" onclick="copyCode(this, 'code-node')">Copy Code</button>
+            <span>Node.js (Native Fetch)</span>
+            <button class="copy-btn" onclick="copyCode(this, 'code-node')">Copy</button>
         </div>
-        <pre id="code-node"><code><span class="c-comment">// 1. Your user submits the form on your website</span>
+        <pre id="code-node"><code><span class="c-comment">// 1. Your user submits form</span>
 app.post('/my-tv-login', async (req, res) => {
     
-    <span class="c-comment">// 2. Prepare the data to forward to OOR</span>
+    <span class="c-comment">// 2. Prepare data</span>
     const formData = new FormData();
     formData.append('tv_code', req.body.tv_code);
-    
-    <span class="c-comment">// Optional filters from your form</span>
     if (req.body.plan) formData.append('plan', req.body.plan);
-    if (req.body.quality) formData.append('quality', req.body.quality);
 
     try {
-        <span class="c-comment">// 3. Send secure request to OOR API</span>
+        <span class="c-comment">// 3. Securely forward to OOR</span>
         const response = await fetch(<span class="c-string">'https://YOUR_API_DOMAIN/api/tv-login'</span>, {
             method: 'POST',
             headers: {
                 'X-API-Key': <span class="c-string">'oor_YOUR_HIDDEN_API_KEY'</span>,
-                'Origin': <span class="c-string">'https://your-website.com'</span> <span class="c-comment">// Must match your allowed domain</span>
+                'Origin': <span class="c-string">'https://your-website.com'</span>
             },
             body: formData
         });
 
         const data = await response.json();
-        
-        <span class="c-comment">// 4. Return the OOR success/fail JSON to your frontend</span>
         res.status(response.status).json(data);
 
     } catch (error) {
-        res.status(500).json({ success: false, message: "Server error" });
+        res.status(500).json({ success: false, message: "Error" });
     }
 });</code></pre>
     </div>
@@ -168,19 +168,16 @@ app.post('/my-tv-login', async (req, res) => {
     <div class="code-wrapper">
         <div class="code-header">
             <span>PHP (cURL)</span>
-            <button class="copy-btn" onclick="copyCode(this, 'code-php')">Copy Code</button>
+            <button class="copy-btn" onclick="copyCode(this, 'code-php')">Copy</button>
         </div>
         <pre id="code-php"><code>&lt;?php
-<span class="c-comment">// Save this as tv-login.php on your server</span>
 $api_key = <span class="c-string">"oor_YOUR_HIDDEN_API_KEY"</span>;
 $api_url = <span class="c-string">"https://YOUR_API_DOMAIN/api/tv-login"</span>;
 $your_domain = <span class="c-string">"https://your-website.com"</span>;
 
 $postData = [
     'tv_code'  => $_POST['tv_code'] ?? '',
-    'plan'     => $_POST['plan'] ?? '',       
-    'quality'  => $_POST['quality'] ?? '',    
-    'language' => $_POST['language'] ?? ''    
+    'plan'     => $_POST['plan'] ?? ''
 ];
 
 $ch = curl_init($api_url);
