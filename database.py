@@ -68,10 +68,9 @@ def delete_cookie(nid: str):
 import datetime
 import pytz
 
-def create_api_key(api_key: str, role: str, domain: str, quota_limit: int, quota_period: str):
+def create_api_key(api_key: str, role: str, quota_limit: int, quota_period: str):
     r.hset(f"apikey:{api_key}", mapping={
         "role": role, 
-        "domain": domain.rstrip('/'),
         "quota_limit": quota_limit,
         "quota_period": quota_period,
         "created_at": datetime.datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%Y-%m-%d %H:%M')
