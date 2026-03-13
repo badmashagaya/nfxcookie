@@ -304,6 +304,21 @@
             border: 1px solid var(--border); max-height: 100px; overflow-y: auto; display: none; width: 100%;
         }
 
+        /* Large phones (420px+) */
+        @media (min-width: 420px) {
+            .segmented-control {
+                width: 400px;
+            }
+
+            .import-card {
+                max-width: 400px;
+            }
+
+            .modal-box {
+                max-width: 400px;
+            }
+        }
+        
         @media (min-width: 768px) {
             body {
                 justify-content: center;
