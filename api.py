@@ -13,7 +13,9 @@ import time
 
 import core
 import database
-from admin import admin_router
+
+# Import verify_admin so we can reuse the Username/Password popup!
+from admin import admin_router, verify_admin 
 
 app = FastAPI(title="OOR Full System")
 
@@ -48,14 +50,12 @@ def verify_security(api_key: str = Depends(api_key_header)):
     quota_limit = int(key_data.get("quota_limit", 0))
     quota_period = key_data.get("quota_period", "lifetime")
     
-    # If a limit is set (greater than 0), verify usage
     if quota_limit > 0:
         current_usage = database.get_usage(api_key, quota_period)
         if current_usage >= quota_limit:
             raise HTTPException(status_code=429, detail=f"Quota Exceeded. Limit of {quota_limit} requests ({quota_period}) reached.")
 
     return key_data
-
 
 
 # --- BACKGROUND AUTO-SCANNER ---
@@ -172,9 +172,15 @@ def get_task_status(task_id: str, key_data: dict = Depends(verify_security)):
         
     return task_data
 
+# --- FIX: NOW USES HTTP BASIC AUTH FOR DIRECT BROWSER ACCESS ---
 @app.get("/api/cookies")
-def get_all_cookies(plan: Optional[str] = None, quality: Optional[str] = None, language: Optional[str] = None, key_data: dict = Depends(verify_security)):
-    if key_data.get("role") != "owner": return JSONResponse(status_code=403, content={"error": "Unauthorized"})
+@app.get("/api/cookie")
+def get_all_cookies(
+    plan: Optional[str] = None, 
+    quality: Optional[str] = None, 
+    language: Optional[str] = None, 
+    user: str = Depends(verify_admin)  # Protects with Admin Username/Password
+):
     results = database.get_filtered_cookies(plan, quality, language)
     return {"count": len(results), "data": results}
 
