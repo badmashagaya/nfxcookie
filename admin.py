@@ -25,7 +25,6 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
     
     for k in keys:
         role = k.get('role', 'N/A').upper()
-        domain = k.get('domain', 'ALL DOMAINS')
         key_str = k['key']
         limit = int(k.get('quota_limit', 0))
         period = k.get('quota_period', 'lifetime').capitalize()
@@ -38,7 +37,7 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
         if percentage >= 100: bar_color = "#ff3b30" 
         
         if percentage >= 90 and role != "OWNER":
-            alerts_html += f"<div class='alert-box'>⚠️ Reseller <b>{domain}</b> is at {int(percentage)}% of their {period} quota.</div>"
+            alerts_html += f"<div class='alert-box'>⚠️ Key <b>{key_str[:12]}...</b> is at {int(percentage)}% of its {period} quota.</div>"
         
         limit_display = "Unlimited" if limit == 0 else f"{limit} ({period})"
         
@@ -46,7 +45,6 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
         <div class="key-card">
             <div class="key-header">
                 <span class="key-role" style="color: {role_color};">{role}</span>
-                <span class="key-domain">{domain}</span>
             </div>
             <div class="key-string">{key_str}</div>
             
@@ -104,7 +102,6 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
         .key-card { background: var(--input-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; display: flex; flex-direction: column; transition: border-color 0.2s; }
         .key-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;}
         .key-role { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
-        .key-domain { font-size: 10px; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; word-break: break-all; max-width: 100%;}
         .key-string { font-family: ui-monospace, monospace; font-size: 11px; color: var(--text-primary); background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); word-break: break-all; margin-bottom: 14px;}
         
         .quota-section { width: 100%; }
@@ -137,7 +134,7 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
     <body>
         <div class="import-card">
             <h2>Security Vault</h2>
-            <p>Generate secure API keys with strict quota limits.</p>
+            <p>Generate secure 128-bit API keys with strict quota limits.</p>
             
             {alerts_html}
             
@@ -145,19 +142,14 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
                 <div class="form-group select-wrapper">
                     <label>Assign Role</label>
                     <select name="role">
-                        <option value="reseller">Reseller (Locked to Domain)</option>
-                        <option value="owner">Owner (Unrestricted)</option>
+                        <option value="reseller">Reseller</option>
+                        <option value="owner">Owner</option>
                     </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>Allowed Domain</label>
-                    <input type="text" name="domain" placeholder="e.g. https://their-site.com">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Quota Limit</label>
+                        <label>Quota Limit (0 = Unlimited)</label>
                         <input type="number" name="quota_limit" placeholder="e.g. 100" required>
                     </div>
                     <div class="form-group select-wrapper">
@@ -171,7 +163,7 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
                     </div>
                 </div>
                 
-                <button type="submit" class="btn-white">+ Generate API Key</button>
+                <button type="submit" class="btn-white">+ Generate 128-bit API Key</button>
             </form>
         </div>
 
@@ -185,10 +177,10 @@ def admin_dashboard(request: Request, user: str = Depends(verify_admin)):
     return HTMLResponse(content=html)
 
 @admin_router.post("/admin/create")
-def create_key(role: str = Form(...), domain: str = Form(""), quota_limit: int = Form(...), quota_period: str = Form(...), user: str = Depends(verify_admin)):
+def create_key(role: str = Form(...), quota_limit: int = Form(...), quota_period: str = Form(...), user: str = Depends(verify_admin)):
+    # secrets.token_hex(16) perfectly generates 16 bytes = 128 bits of entropy (32 characters long)
     new_key = "oor_" + secrets.token_hex(16)
-    if role == "owner": domain = "ALL"
-    database.create_api_key(new_key, role, domain, quota_limit, quota_period)
+    database.create_api_key(new_key, role, quota_limit, quota_period)
     return RedirectResponse(url="/admin", status_code=303)
 
 @admin_router.post("/admin/delete")
