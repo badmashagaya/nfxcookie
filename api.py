@@ -44,7 +44,12 @@ def verify_security(api_key: str = Depends(api_key_header)):
     if not key_data:
         raise HTTPException(status_code=401, detail="Invalid API Key")
 
+    # --- NEW: BLOCK DEACTIVATED KEYS ---
+    if key_data.get("active") == "false":
+        raise HTTPException(status_code=403, detail="API Key has been deactivated. Access Denied.")
+
     key_data['api_key'] = api_key
+    
 
     # --- QUOTA CHECK ---
     quota_limit = int(key_data.get("quota_limit", 0))
