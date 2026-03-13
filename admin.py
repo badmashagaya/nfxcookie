@@ -428,32 +428,67 @@ document.getElementById('addPeriod').value='monthly';
 openModal('addModal');
 }
 
+// FIX: Label is now properly passed to the Python Backend
 async function addKey(){
-var role=document.getElementById('addRole').value;
-var label=document.getElementById('addLabel').value.trim();
-var quota=parseInt(document.getElementById('addQuota').value)||0;
-var period=document.getElementById('addPeriod').value;
-if(!currentGenKey){showToast('Key generation failed','error');return}
-var btn=document.getElementById('addSubmitBtn');
-btn.disabled=true;btn.textContent='Creating...';
-try{
-var r=await fetch('/admin/api/keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:currentGenKey,role:role,quota_limit:quota,quota_period:period})});
-var d=await r.json();
-if(!d.success){showToast(d.error||'Failed to create key','error');btn.disabled=false;btn.textContent='Create Key';return}
-}catch(e){}
-allKeys.unshift({key:currentGenKey,label:label||'Unnamed Key',role:role,active:true,quota_limit:quota,quota_period:period,current_usage:0});
-renderKeys(allKeys);updateStats();updateAlertBadge();
-closeModal('addModal');showToast('API key created','success');
-btn.disabled=false;btn.textContent='Create Key';
+    var role=document.getElementById('addRole').value;
+    var label=document.getElementById('addLabel').value.trim();
+    var quota=parseInt(document.getElementById('addQuota').value)||0;
+    var period=document.getElementById('addPeriod').value;
+    
+    if(!currentGenKey){showToast('Key generation failed','error');return;}
+    
+    var btn=document.getElementById('addSubmitBtn');
+    btn.disabled=true;btn.textContent='Creating...';
+    
+    try{
+        var r=await fetch('/admin/api/keys',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+                key: currentGenKey,
+                role: role,
+                label: label, 
+                quota_limit: quota,
+                quota_period: period
+            })
+        });
+        var d=await r.json();
+        if(!d.success){showToast(d.error||'Failed to create key','error');btn.disabled=false;btn.textContent='Create Key';return;}
+    }catch(e){
+        showToast('Network error','error');btn.disabled=false;btn.textContent='Create Key';return;
+    }
+    
+    allKeys.unshift({key:currentGenKey,label:label||'Unnamed Key',role:role,active:true,quota_limit:quota,quota_period:period,current_usage:0});
+    renderKeys(allKeys);updateStats();updateAlertBadge();
+    closeModal('addModal');showToast('API key created','success');
+    btn.disabled=false;btn.textContent='Create Key';
 }
 
-function toggleKey(key){
-var k=allKeys.find(function(x){return x.key===key});
-if(!k)return;
-if(k.active===undefined)k.active=true;
-k.active=!k.active;
-renderKeys(allKeys);updateStats();
-showToast(k.active?'Key activated':'Key deactivated',k.active?'success':'error');
+// FIX: Database synchronization added so activation/deactivation is saved!
+async function toggleKey(key){
+    var k=allKeys.find(function(x){return x.key===key});
+    if(!k)return;
+    
+    var newStatus = k.active === false ? true : false;
+    
+    try{
+        var r=await fetch('/admin/api/keys/toggle',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({api_key: key, active: newStatus})
+        });
+        var d=await r.json();
+        
+        if(d.success){
+            k.active = newStatus;
+            renderKeys(allKeys);updateStats();
+            showToast(k.active?'Key activated':'Key deactivated',k.active?'success':'error');
+        } else {
+            showToast('Failed to toggle key','error');
+        }
+    }catch(e){
+        showToast('Network error','error');
+    }
 }
 
 function promptDelete(key){deleteTargetKey=key;openModal('deleteModal')}
@@ -498,6 +533,11 @@ toastTimer=setTimeout(function(){t.className='toast'},2200);
 @admin_router.get("/admin/api/keys")
 def get_keys(user: str = Depends(verify_admin)):
     keys = database.get_all_keys()
+    
+    # FIX: Convert Redis string 'true'/'false' into an actual Boolean for Javascript 
+    for k in keys:
+        k["active"] = False if k.get("active") == "false" else True
+        
     return {"keys": keys}
 
 
@@ -506,9 +546,11 @@ async def create_key_api(request: Request, user: str = Depends(verify_admin)):
     body = await request.json()
     key = body.get("key", "oor_" + secrets.token_hex(16))
     role = body.get("role", "reseller")
+    label = body.get("label", "Unnamed Key") # <--- Extracts label from UI
     quota_limit = int(body.get("quota_limit", 0))
     quota_period = body.get("quota_period", "lifetime")
-    database.create_api_key(key, role, quota_limit, quota_period)
+    
+    database.create_api_key(key, role, label, quota_limit, quota_period)
     return {"success": True}
 
 
@@ -519,4 +561,17 @@ async def delete_key_api(request: Request, user: str = Depends(verify_admin)):
     if not api_key:
         raise HTTPException(status_code=400, detail="api_key required")
     database.delete_api_key(api_key)
+    return {"success": True}
+
+# --- FIX: NEW ENDPOINT TO HANDLE THE ACTIVATE/DEACTIVATE TOGGLE ---
+@admin_router.post("/admin/api/keys/toggle")
+async def toggle_key_api(request: Request, user: str = Depends(verify_admin)):
+    body = await request.json()
+    api_key = body.get("api_key")
+    active = body.get("active", True)
+    
+    if not api_key:
+        raise HTTPException(status_code=400, detail="api_key required")
+        
+    database.toggle_api_key(api_key, active)
     return {"success": True}
