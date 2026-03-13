@@ -68,13 +68,20 @@ def delete_cookie(nid: str):
 import datetime
 import pytz
 
-def create_api_key(api_key: str, role: str, quota_limit: int, quota_period: str):
+def create_api_key(api_key: str, role: str, label: str, quota_limit: int, quota_period: str):
     r.hset(f"apikey:{api_key}", mapping={
         "role": role, 
+        "label": label,          # <--- Now saves the custom label
+        "active": "true",        # <--- Defaults to active
         "quota_limit": quota_limit,
         "quota_period": quota_period,
         "created_at": datetime.datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%Y-%m-%d %H:%M')
     })
+
+def toggle_api_key(api_key: str, active: bool):
+    # Switches the key between "true" and "false" in the database
+    r.hset(f"apikey:{api_key}", "active", "true" if active else "false")
+
 
 def get_api_key(api_key: str):
     return r.hgetall(f"apikey:{api_key}")
