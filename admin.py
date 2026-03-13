@@ -154,7 +154,7 @@ body{font-family:'Nexa',sans-serif;font-weight:300;background:var(--bg);color:va
 .toast-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .toast-text{font-size:13px;font-weight:700;color:rgba(255,255,255,0.85);font-family:'Nexa',sans-serif;white-space:nowrap;line-height:1}
 
-.site-footer{margin-top:0;padding-top:30px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;font-size:11px;font-weight:400;color:var(--text2);text-align:center;opacity:.4;letter-spacing:.2px}
+.site-footer{margin-top:0;padding-top:30px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;font-size:13px;font-weight:400;color:var(--text2);text-align:center;opacity:.4;letter-spacing:.2px}
 
 @media(min-width:420px){.layout{max-width:400px}.modal{max-width:360px}}
 @media(min-width:768px){
