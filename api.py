@@ -34,7 +34,7 @@ upload_tasks = {}
 # --- 2. SECURITY: THE VAULT INTERCEPTOR WITH QUOTAS ---
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
-def verify_security(request: Request, api_key: str = Depends(api_key_header)):
+def verify_security(api_key: str = Depends(api_key_header)):
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing X-API-Key header")
         
@@ -48,24 +48,14 @@ def verify_security(request: Request, api_key: str = Depends(api_key_header)):
     quota_limit = int(key_data.get("quota_limit", 0))
     quota_period = key_data.get("quota_period", "lifetime")
     
+    # If a limit is set (greater than 0), verify usage
     if quota_limit > 0:
         current_usage = database.get_usage(api_key, quota_period)
         if current_usage >= quota_limit:
             raise HTTPException(status_code=429, detail=f"Quota Exceeded. Limit of {quota_limit} requests ({quota_period}) reached.")
 
-    if key_data.get("role") == "owner":
-        return key_data
-
-    origin = request.headers.get("origin")
-    allowed_domain = key_data.get("domain", "")
-
-    if not origin:
-        raise HTTPException(status_code=403, detail="Requests must include an Origin header matching the allowed domain.")
-        
-    if origin.rstrip('/') != allowed_domain.rstrip('/'):
-        raise HTTPException(status_code=403, detail=f"Unauthorized domain. This key is locked to {allowed_domain}")
-
     return key_data
+
 
 
 # --- BACKGROUND AUTO-SCANNER ---
