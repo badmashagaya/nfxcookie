@@ -180,6 +180,7 @@ def delete_rescan_proxy(user: str = Depends(verify_admin)):
         os.remove("rescan_proxies.txt")
     return {"success": True, "message": "Custom proxies deleted successfully."}
 
+
 @app.get("/rescan", response_class=HTMLResponse)
 def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
     html = f"""
@@ -195,15 +196,15 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             * {{ -webkit-tap-highlight-color: transparent; outline: none; box-sizing: border-box; }}
             
             body {{ 
-                margin: 0; padding: 20px; 
+                margin: 0; padding: 40px 20px; 
                 font-family: 'Nexa', sans-serif; font-weight: 300; 
                 background: var(--bg-color); color: var(--text-primary); 
                 display: flex; flex-direction: column; 
-                align-items: center; justify-content: space-between; 
+                align-items: center; justify-content: flex-start; 
                 min-height: 100vh;
             }}
             
-            .main-content {{ flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; padding: 40px 0; }}
+            .main-content {{ display: flex; align-items: center; justify-content: center; width: 100%; }}
             
             .import-card {{
                 background: var(--card-bg); border-radius: 20px; padding: 30px 20px; width: 100%; max-width: 380px; position: relative;
@@ -268,13 +269,14 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             .toast-title {{ font-size: 14px; font-weight: 700; margin-bottom: 4px; }}
             .toast-message {{ font-size: 12px; color: var(--text-secondary); line-height: 1.4; }}
 
-            .site-footer {{ font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-bottom: 10px; }}
+            .site-footer {{ margin-top: 0; padding-top: 30px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; }}
 
             /* Responsive Media Queries */
             @media (min-width: 420px) {{
                 .import-card {{ padding: 40px 30px; }}
             }}
             @media (min-width: 768px) {{
+                body {{ padding: 60px 40px; justify-content: center; }}
                 .import-card {{ max-width: 480px; padding: 48px 40px; border-radius: 24px; }}
                 .import-card::before {{ border-radius: 24px; }}
                 h2 {{ font-size: 22px; }}
@@ -344,9 +346,9 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
                     <button class="btn-white" id="btnSchedule" onclick="updateSchedule()">Save Configuration</button>
                 </div>
             </div>
+            
+            <div class="site-footer" id="siteFooter"></div>
         </div>
-
-        <div class="site-footer" id="siteFooter"></div>
 
         <script>
             document.getElementById('siteFooter').textContent = '\u00A9 ' + new Date().getFullYear() + ' OORverse. All rights reserved.';
