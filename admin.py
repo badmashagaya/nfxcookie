@@ -356,7 +356,7 @@ var usage=parseInt(k.current_usage)||0;
 var period=cap(k.quota_period||'lifetime');
 var pct=limit>0?Math.min(Math.round(usage/limit*100),100):0;
 var limitStr=limit===0?'Unlimited':usage+' / '+limit;
-var pctStr=limit===0?'\u221E':pct+'%';
+var pctStr=limit===0?'<span style="font-size: 18px; line-height: 0; vertical-align: middle; display: inline-block;">\u221E</span>':pct+'%';
 var bw=limit===0?100:pct;
 var bc=limit===0?'var(--green)':quotaColor(pct);
 var isActive=k.active!==false;
