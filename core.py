@@ -9,7 +9,7 @@ import io
 from queue import Queue, Empty
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 import requests
 
 # ==========================================
@@ -25,31 +25,50 @@ def _build_proxy_dict(scheme, host, port, user=None, password=None):
     return {"http": proxy_url, "https": proxy_url}
 
 def _parse_proxy_line(line):
-    line = line.strip()
+    # 1. Aggressively strip invisible Windows characters (BOM) & control bytes
+    line = line.strip().lstrip('\ufeff').lstrip('\u200b')
+    line = re.sub(r'[\x00-\x1F\x7F-\x9F]', '', line)
     if not line or line.startswith("#"): return None
+    
+    # 2. Native URL Fallback (Perfect for http://user:pass@host:port)
+    if "://" in line:
+        try:
+            p = urlparse(line)
+            if p.hostname and p.port:
+                return _build_proxy_dict(p.scheme or "http", p.hostname, p.port, p.username, p.password)
+        except:
+            pass
+
+    # 3. Standard Regex Parsing
     line = re.sub(r"^([a-zA-Z][a-zA-Z0-9+.-]*):/+", r"\1://", line)
     line = re.sub(r"\s+", " ", line).strip()
+    
     url_like = re.match(r"^(?P<scheme>https?|socks5h?|socks4a?)://(?:(?P<user>[^:@\s]+):(?P<password>[^@\s]+)@)?(?P<host>\[[^\]]+\]|[^:\s]+):(?P<port>\d+)$", line, flags=re.IGNORECASE)
     if url_like:
         data = url_like.groupdict()
         return _build_proxy_dict(data["scheme"].lower(), data["host"], data["port"], data.get("user"), data.get("password"))
+        
     userpass_hostport = re.match(r"^(?P<user>[^:@\s]+):(?P<password>[^@\s]+)@(?P<host>\[[^\]]+\]|[^:\s]+):(?P<port>\d+)$", line)
     if userpass_hostport:
         data = userpass_hostport.groupdict()
         return _build_proxy_dict("http", data["host"], data["port"], data["user"], data["password"])
+        
     hostport_userpass = re.match(r"^(?P<host>\[[^\]]+\]|[^:\s]+):(?P<port>\d+)@(?P<user>[^:@\s]+):(?P<password>[^@\s]+)$", line)
     if hostport_userpass:
         data = hostport_userpass.groupdict()
         return _build_proxy_dict("http", data["host"], data["port"], data["user"], data["password"])
+        
     hostport = re.match(r"^(?P<host>\[[^\]]+\]|[^:\s]+):(?P<port>\d+)$", line)
     if hostport:
         data = hostport.groupdict()
         return _build_proxy_dict("http", data["host"], data["port"])
+        
     four_part = line.split(":")
     if len(four_part) == 4:
         a, b, c, d = four_part
         if b.isdigit() and not d.isdigit(): return _build_proxy_dict("http", a, b, c, d)
         if d.isdigit() and not b.isdigit(): return _build_proxy_dict("http", c, d, a, b)
+        
     split_patterns = [
         r"^(?P<host>\[[^\]]+\]|[^:\s]+):(?P<port>\d+)\s+(?P<user>[^:\s]+):(?P<password>\S+)$",
         r"^(?P<host>\[[^\]]+\]|[^:\s]+):(?P<port>\d+)\|(?P<user>[^:\s]+):(?P<password>\S+)$",
@@ -61,6 +80,7 @@ def _parse_proxy_line(line):
         if match:
             data = match.groupdict()
             return _build_proxy_dict("http", data["host"], data["port"], data["user"], data["password"])
+            
     return None
 
 def load_proxies():
@@ -77,7 +97,8 @@ def load_proxies():
 def parse_proxies_from_bytes(file_bytes: bytes) -> list:
     proxies = []
     try:
-        text_content = file_bytes.decode('utf-8', errors='ignore')
+        # utf-8-sig natively destroys the Windows invisible Byte Order Mark!
+        text_content = file_bytes.decode('utf-8-sig', errors='ignore')
         for line in text_content.splitlines():
             proxy = _parse_proxy_line(line)
             if proxy: proxies.append(proxy)
@@ -91,13 +112,17 @@ def get_public_ip(proxies):
         resp = requests.get("https://api.myip.com", timeout=5).json()
         local_ip = f"{resp.get('ip')} ({resp.get('country')})"
     except: local_ip = "Unable to verify (Network Error)"
+    
     proxy_info = f"Proxies loaded: {len(proxies)}" if proxies else "No proxies used."
     if proxies:
         test_proxy = random.choice(proxies)
         try:
             p_resp = requests.get("https://api.myip.com", proxies=test_proxy, timeout=5).json()
             proxy_info += f" | Proxy Verified IP: {p_resp.get('ip')} ({p_resp.get('country')})"
-        except: proxy_info += " | Proxy Verification: Failed"
+        except Exception as e: 
+            # Now prints the EXACT reason the proxy failed (e.g., Timeout, ProxyError)
+            proxy_info += f" | Proxy Verification: Failed ({type(e).__name__})"
+            
     return local_ip, proxy_info
 
 # ==========================================
@@ -436,7 +461,6 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
     clean_id = netflix_id.replace("NetflixId=", "").strip()
     session = requests.Session()
     
-    # Exact headers required to spoof the TV rendezvous request securely
     headers = {
         "authority":                  "www.netflix.com",
         "accept":                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -460,17 +484,12 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
     proxy = random.choice(proxies) if proxies else None
 
     try:
-        # Step 1: Hit home page to refresh secure session cookies
         session.get("https://www.netflix.com/", proxies=proxy, timeout=15)
-        
-        # Grab newly assigned NetflixId
         refreshed_id = session.cookies.get("NetflixId") or clean_id
         refreshed_cookie_string = f"NetflixId={refreshed_id}"
 
-        # Step 2: Fetch the hidden authURL from the /tv8 path
         res_tv8 = session.get("https://www.netflix.com/tv8", proxies=proxy, timeout=15)
         
-        # Try both the deep-search React parser and HTML regex fallbacks
         auth_url = find_auth_in_react_context(res_tv8.text)
         if not auth_url:
             auth_url = find_auth_in_html(res_tv8.text)
@@ -478,7 +497,6 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
         if not auth_url:
             return False, "Failed to extract dynamic authURL. The cookie session may be expired or invalid.", refreshed_cookie_string
 
-        # Step 3: Build the payload and submit TV Code
         post_data = {
             "flow":                  "websiteSignUp",
             "authURL":               auth_url,
@@ -505,7 +523,6 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
             allow_redirects=True
         )
         
-        # Step 4: Strict validation check
         final_url = res_post.url.rstrip('/').split('?')[0].lower()
         
         if final_url == "https://www.netflix.com/tv/out/success":
