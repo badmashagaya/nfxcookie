@@ -73,6 +73,18 @@ def load_proxies():
                 if proxy: proxies.append(proxy)
     return proxies
 
+# --- NEW: DYNAMIC PROXY PARSER ---
+def parse_proxies_from_bytes(file_bytes: bytes) -> list:
+    proxies = []
+    try:
+        text_content = file_bytes.decode('utf-8', errors='ignore')
+        for line in text_content.splitlines():
+            proxy = _parse_proxy_line(line)
+            if proxy: proxies.append(proxy)
+    except Exception:
+        pass
+    return proxies
+
 def get_public_ip(proxies):
     local_ip = "Unknown"
     try:
