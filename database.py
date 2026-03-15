@@ -138,3 +138,20 @@ def delete_cookie_db(netflix_id: str):
     # 2. Erase the actual JSON hash objects
     r.delete(f"cookie:{raw_id}")
     r.delete(f"cookie:{full_id}")
+
+# --- SYSTEM CONFIGURATION ---
+def set_rescan_config(schedule: str, use_proxies: bool):
+    r.hset("config:rescan", mapping={
+        "schedule": schedule, 
+        "use_proxies": "true" if use_proxies else "false"
+    })
+
+def get_rescan_config():
+    conf = r.hgetall("config:rescan")
+    if not conf: 
+        return {"schedule": "0,8,16", "use_proxies": True}
+    return {
+        "schedule": conf.get("schedule", "0,8,16"), 
+        "use_proxies": conf.get("use_proxies") == "true"
+    }
+    
