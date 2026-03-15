@@ -42,7 +42,14 @@ app.use('/admin', createProxyMiddleware({
     changeOrigin: true
 }));
 
-// 4. The Documentation Route
+// 4. The Secure Rescan Proxy (NEW)
+// Forwards /rescan requests from Render to your VPS Rescan Dashboard
+app.use('/rescan', createProxyMiddleware({
+    target: PYTHON_API_URL,
+    changeOrigin: true
+}));
+
+// 5. The Documentation Route
 // This makes the pretty /oordocs URL work instantly
 app.get('/oordocs', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'docs.html'));
