@@ -44,7 +44,7 @@ def verify_security(api_key: str = Depends(api_key_header)):
     if not key_data:
         raise HTTPException(status_code=401, detail="Invalid API Key")
 
-    # --- NEW: BLOCK DEACTIVATED KEYS ---
+    # --- BLOCK DEACTIVATED KEYS ---
     if key_data.get("active") == "false":
         raise HTTPException(status_code=403, detail="API Key has been deactivated. Access Denied.")
 
@@ -100,6 +100,7 @@ scheduler.start()
 async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    proxy_file: Optional[UploadFile] = File(None), # <--- CORRECT FIX: Optional Proxy File
     req_plan: str = Form(""),
     req_quality: str = Form(""),
     req_language: str = Form(""),
@@ -118,6 +119,14 @@ async def upload_file(
     id_list = list(extracted_ids)
     task_id = str(uuid.uuid4())
     upload_tasks[task_id] = {"status": "running", "total": len(id_list), "checked": 0, "summary": None, "start_time": time.time(), "eta": 0}
+
+    # --- CORRECT FIX: Parse Custom Proxies if Provided ---
+    request_proxies = PROXIES
+    if proxy_file and proxy_file.filename:
+        proxy_bytes = await proxy_file.read()
+        custom_proxies = core.parse_proxies_from_bytes(proxy_bytes)
+        if custom_proxies:
+            request_proxies = custom_proxies
 
     def run_nfx_and_store():
         q = Queue()
@@ -141,7 +150,8 @@ async def upload_file(
         else: num_threads = 50
             
         for _ in range(num_threads):
-            t = threading.Thread(target=core.check_worker, args=(q, print_lock, stats, PROXIES, processed_guids, guid_lock, db_save_hook))
+            # CORRECT FIX: Uses request_proxies
+            t = threading.Thread(target=core.check_worker, args=(q, print_lock, stats, request_proxies, processed_guids, guid_lock, db_save_hook))
             t.daemon = True
             t.start()
             threads.append(t)
@@ -151,7 +161,10 @@ async def upload_file(
             time.sleep(0.5)
 
         q.join()
-        local_ip, proxy_status = core.get_public_ip(PROXIES)
+        
+        # Get IP data dynamically based on the proxies used for this run
+        local_ip, proxy_status = core.get_public_ip(request_proxies)
+        
         upload_tasks[task_id]["checked"] = num_cookies
         upload_tasks[task_id]["status"] = "completed"
         upload_tasks[task_id]["eta"] = 0
@@ -177,7 +190,7 @@ def get_task_status(task_id: str, key_data: dict = Depends(verify_security)):
         
     return task_data
 
-# --- FIX: NOW USES HTTP BASIC AUTH FOR DIRECT BROWSER ACCESS ---
+# --- USES HTTP BASIC AUTH FOR DIRECT BROWSER ACCESS ---
 @app.get("/api/cookies")
 @app.get("/api/cookie")
 def get_all_cookies(
