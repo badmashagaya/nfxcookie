@@ -100,7 +100,7 @@ scheduler.start()
 async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    proxy_file: Optional[UploadFile] = File(None), # <--- CORRECT FIX: Optional Proxy File
+    proxy_file: UploadFile = File(None), # <--- CORRECT FIX: Strictly maps the optional UploadFile
     req_plan: str = Form(""),
     req_quality: str = Form(""),
     req_language: str = Form(""),
@@ -120,7 +120,7 @@ async def upload_file(
     task_id = str(uuid.uuid4())
     upload_tasks[task_id] = {"status": "running", "total": len(id_list), "checked": 0, "summary": None, "start_time": time.time(), "eta": 0}
 
-    # --- CORRECT FIX: Parse Custom Proxies if Provided ---
+    # --- Parse Custom Proxies if Provided ---
     request_proxies = PROXIES
     if proxy_file and proxy_file.filename:
         proxy_bytes = await proxy_file.read()
@@ -150,7 +150,6 @@ async def upload_file(
         else: num_threads = 50
             
         for _ in range(num_threads):
-            # CORRECT FIX: Uses request_proxies
             t = threading.Thread(target=core.check_worker, args=(q, print_lock, stats, request_proxies, processed_guids, guid_lock, db_save_hook))
             t.daemon = True
             t.start()
@@ -162,7 +161,6 @@ async def upload_file(
 
         q.join()
         
-        # Get IP data dynamically based on the proxies used for this run
         local_ip, proxy_status = core.get_public_ip(request_proxies)
         
         upload_tasks[task_id]["checked"] = num_cookies
@@ -197,7 +195,7 @@ def get_all_cookies(
     plan: Optional[str] = None, 
     quality: Optional[str] = None, 
     language: Optional[str] = None, 
-    user: str = Depends(verify_admin)  # Protects with Admin Username/Password
+    user: str = Depends(verify_admin) 
 ):
     results = database.get_filtered_cookies(plan, quality, language)
     return {"count": len(results), "data": results}
