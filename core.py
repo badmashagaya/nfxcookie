@@ -129,7 +129,7 @@ def get_public_ip(proxies):
 # --- FLAWLESS COOKIE EXTRACTOR ---
 # ==========================================
 def extract_ids_from_bytes(file_bytes: bytes, filename: str) -> set:
-    pattern = re.compile(r"(NetflixId=[^\s;\"']+)")
+    pattern = re.compile(r"(NetflixId=[a-zA-Z0-9%_\-\.\=\*\+\~]+)")
     unique_ids = set()
     filename = filename or ""
     
