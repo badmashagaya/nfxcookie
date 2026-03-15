@@ -194,16 +194,16 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             :root {{ --bg-color: #000; --card-bg: #06060c; --text-primary: #fff; --text-secondary: #8e8e99; --accent: rgb(0, 136, 255); --border: rgba(255, 255, 255, 0.1); --input-bg: rgba(255, 255, 255, 0.05); }}
             * {{ -webkit-tap-highlight-color: transparent; outline: none; box-sizing: border-box; }}
             
-            body { 
+            body {{ 
                 margin: 0; padding: 40px 20px; 
                 font-family: 'Nexa', sans-serif; font-weight: 300; 
                 background: var(--bg-color); color: var(--text-primary); 
                 display: flex; flex-direction: column; 
-                align-items: center; justify-content: center; /* Centers both items vertically together */
+                align-items: center; justify-content: center; 
                 min-height: 100vh;
-            }
+            }}
 
-            .main-content { display: flex; align-items: center; justify-content: center; width: 100%; }
+            .main-content {{ display: flex; align-items: center; justify-content: center; width: 100%; }}
 
             
             .import-card {{
@@ -269,7 +269,7 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             .toast-title {{ font-size: 14px; font-weight: 700; margin-bottom: 4px; }}
             .toast-message {{ font-size: 12px; color: var(--text-secondary); line-height: 1.4; }}
 
-            .site-footer { margin-top: 15px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-bottom: 10px; }
+            .site-footer {{ margin-top: 15px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-bottom: 10px; }}
 
 
             /* Responsive Media Queries */
