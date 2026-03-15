@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OOR Data Importer</title>
+    <title>OORvault</title>
     
     <style>
         @import url('https://fonts.cdnfonts.com/css/nexa-bold');
@@ -162,6 +162,20 @@
             border-color: rgba(255,255,255,0.5);
             background: rgba(255,255,255,0.08);
         }
+        
+        /* Validation Error State */
+        .file-upload-wrapper.error {
+            border-color: #ff3b30 !important;
+            background: rgba(255, 59, 48, 0.1) !important;
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+            40%, 60% { transform: translate3d(8px, 0, 0); }
+        }
+
         .file-upload-wrapper input[type="file"] {
             position: absolute; top: 0; left: 0;
             width: 100%; height: 100%;
@@ -180,7 +194,36 @@
         }
         .file-name-display {
             font-size: 13px; color: var(--text-secondary); font-weight: 700;
-            word-break: break-all; text-align: center; padding: 0 10px;
+            word-break: break-all; text-align: center; padding: 0 10px; transition: color 0.3s;
+        }
+
+        /* --- Minimal Proxy Toggle UI --- */
+        .proxy-toggle-btn {
+            font-size: 13px;
+            color: #ffffff !important; 
+            text-align: left;
+            margin: -5px 0 20px 4px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: transform 0.1s ease;
+            display: inline-block;
+            -webkit-tap-highlight-color: transparent; /* Removes the mobile grey tap box */
+        }
+        .proxy-toggle-btn:hover, .proxy-toggle-btn:active {
+            opacity: 1; /* Keeps it pure white */
+            color: #ffffff !important;
+            transform: scale(0.98); /* Adds a slight physical press effect instead of a color fade */
+        }
+
+        .proxy-upload-container {
+            display: none; 
+            margin-bottom: 25px;
+            animation: slideDown 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            transform-origin: top;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: scaleY(0.9); }
+            to { opacity: 1; transform: scaleY(1); }
         }
 
         .form-group { margin-bottom: 16px; position: relative; }
@@ -257,9 +300,6 @@
             letter-spacing: 0.2px;
         }
 
-        /* ========================================== */
-        /* MODAL OVERLAY STYLES (Perfectly Centered)  */
-        /* ========================================== */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.6);
@@ -294,7 +334,6 @@
         }
         .modal-close:hover { background: rgba(255,255,255,0.15); }
         
-        /* Removed bottom margin for perfect vertical centering */
         #modalDesc { margin-bottom: 0; }
         
         .modal-cookie-box {
@@ -304,76 +343,28 @@
             border: 1px solid var(--border); max-height: 100px; overflow-y: auto; display: none; width: 100%;
         }
 
-        /* Large phones (420px+) */
         @media (min-width: 420px) {
-            .segmented-control {
-                width: 400px;
-            }
-
-            .import-card {
-                max-width: 400px;
-            }
-
-            .modal-box {
-                max-width: 400px;
-            }
+            .segmented-control { width: 400px; }
+            .import-card { max-width: 400px; }
+            .modal-box { max-width: 400px; }
         }
         
         @media (min-width: 768px) {
-            body {
-                justify-content: center;
-                padding: 60px 40px;
-            }
-
-            .segmented-control {
-                width: 440px;
-                height: 48px;
-                margin-bottom: 32px;
-            }
-
-            .segment-btn {
-                font-size: 14px;
-            }
-
-            .import-card {
-                max-width: 440px;
-                padding: 48px 40px;
-                border-radius: 24px;
-            }
-            .import-card::before {
-                border-radius: 24px;
-            }
-
-            .modal-box {
-                max-width: 440px;
-                padding: 48px 40px;
-                border-radius: 24px;
-            }
-            .modal-box::before {
-                border-radius: 24px;
-            }
-
+            body { justify-content: center; padding: 60px 40px; }
+            .segmented-control { width: 440px; height: 48px; margin-bottom: 32px; }
+            .segment-btn { font-size: 14px; }
+            .import-card { max-width: 440px; padding: 48px 40px; border-radius: 24px; }
+            .import-card::before { border-radius: 24px; }
+            .modal-box { max-width: 440px; padding: 48px 40px; border-radius: 24px; }
+            .modal-box::before { border-radius: 24px; }
             h2 { font-size: 22px; }
-
-            .file-upload-wrapper {
-                height: 140px;
-                border-radius: 16px;
-            }
-
-            .file-upload-content img {
-                width: 48px; height: 48px;
-            }
+            .file-upload-wrapper { height: 140px; border-radius: 16px; }
+            .file-upload-content img { width: 48px; height: 48px; }
         }
 
         @media (min-width: 1200px) {
-            .segmented-control {
-                width: 480px;
-            }
-
-            .import-card, .modal-box {
-                max-width: 480px;
-                padding: 52px 48px;
-            }
+            .segmented-control { width: 480px; }
+            .import-card, .modal-box { max-width: 480px; padding: 52px 48px; }
         }
     </style>
 </head>
@@ -393,10 +384,22 @@
         
         <form id="uploadForm">
             <div class="file-upload-wrapper">
-                <input type="file" id="fileInput" accept=".zip,.txt" required onchange="updateFileName(this)">
+                <input type="file" id="fileInput" accept=".zip,.txt" required onchange="validateAndUpload(this, 'fileNameDisplay', 'Tap to select .ZIP or .TXT', ['.zip', '.txt'])">
                 <div class="file-upload-content">
                     <img src="https://img.icons8.com/pulsar-gradient/420/upload.png" alt="Upload">
                     <span class="file-name-display" id="fileNameDisplay">Tap to select .ZIP or .TXT</span>
+                </div>
+            </div>
+            
+            <div class="proxy-toggle-btn" id="proxyToggleBtn" onclick="toggleProxyBox()">+ Add Custom Proxies (Optional)</div>
+            
+            <div class="proxy-upload-container" id="proxyUploadContainer">
+                <div class="file-upload-wrapper" style="height: 90px; margin-bottom: 0;">
+                    <input type="file" id="proxyFileInput" accept=".txt" onchange="validateAndUpload(this, 'proxyFileNameDisplay', 'Select Custom Proxies (.TXT)', ['.txt'])">
+                    <div class="file-upload-content" style="gap: 12px;">
+                        <svg viewBox="0 0 24 24" width="24" height="24" stroke="var(--text-secondary)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                        <span class="file-name-display" id="proxyFileNameDisplay">Select Custom Proxies (.TXT)</span>
+                    </div>
                 </div>
             </div>
             
@@ -607,14 +610,54 @@
 <script>
 document.getElementById('siteFooter').textContent = '\u00A9 ' + new Date().getFullYear() + ' OORverse. All rights reserved.';
 
-function updateFileName(input) {
-    const display = document.getElementById('fileNameDisplay');
+// --- NEW: Validation and Upload Handler ---
+function validateAndUpload(input, displayId, defaultText, allowedExtensions) {
+    const display = document.getElementById(displayId);
+    const wrapper = input.closest('.file-upload-wrapper');
+
     if (input.files && input.files.length > 0) {
-        display.innerText = input.files[0].name;
+        const fileName = input.files[0].name;
+        const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+        
+        if (!allowedExtensions.includes(ext)) {
+            // Signal Validation Error
+            input.value = ''; 
+            display.innerText = "Invalid! Only " + allowedExtensions.join(' or ').toUpperCase();
+            display.style.color = "#ff3b30";
+            
+            wrapper.classList.remove('error'); // Reset animation state
+            void wrapper.offsetWidth; // Trigger reflow
+            wrapper.classList.add('error');
+            
+            setTimeout(() => wrapper.classList.remove('error'), 400);
+            return;
+        }
+
+        // Valid File
+        display.innerText = fileName;
         display.style.color = "#ffffff"; 
+        wrapper.classList.remove('error');
     } else {
-        display.innerText = "Tap to select .ZIP or .TXT";
+        display.innerText = defaultText;
         display.style.color = "var(--text-secondary)";
+        wrapper.classList.remove('error');
+    }
+}
+
+function toggleProxyBox() {
+    const box = document.getElementById('proxyUploadContainer');
+    const btn = document.getElementById('proxyToggleBtn');
+    
+    if (box.style.display === 'none' || box.style.display === '') {
+        box.style.display = 'block';
+        btn.innerText = '- Hide Custom Proxies';
+    } else {
+        box.style.display = 'none';
+        btn.innerText = '+ Add Custom Proxies (Optional)';
+        document.getElementById('proxyFileInput').value = '';
+        document.getElementById('proxyFileNameDisplay').innerText = 'Select Custom Proxies (.TXT)';
+        document.getElementById('proxyFileNameDisplay').style.color = "var(--text-secondary)";
+        document.getElementById('proxyFileInput').closest('.file-upload-wrapper').classList.remove('error');
     }
 }
 
@@ -663,7 +706,6 @@ async function pollStatus(taskId) {
             const res = await fetch(`/api/status/${taskId}`);
             const data = await res.json();
             
-            // Fix: Catch FastAPI Security Errors during polling
             if (data.detail) {
                 clearInterval(interval);
                 alert("Security Error: " + data.detail);
@@ -698,6 +740,11 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     formData.append("req_quality", document.getElementById('qualityFilter').value);
     formData.append("req_language", document.getElementById('languageFilter').value);
 
+    const proxyFile = document.getElementById('proxyFileInput').files[0];
+    if (proxyFile) {
+        formData.append("proxy_file", proxyFile);
+    }
+
     try {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
@@ -705,7 +752,6 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
         if (data.task_id) {
             pollStatus(data.task_id);
         } else {
-            // Fix: Catch detail or message
             const errorMsg = data.detail || data.error || "Failed to start engine.";
             alert("Error: " + errorMsg);
             document.getElementById('uploadBtn').disabled = false;
@@ -768,7 +814,6 @@ document.getElementById('tvForm').addEventListener('submit', async (e) => {
         modalIconStatic.style.display = "flex";
         modalCloseBtn.style.display = "flex";
         
-        // Check for success == true
         if (data.success === true) {
             modalIconStatic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>`;
             modalTitle.innerText = "Success!";
@@ -780,7 +825,6 @@ document.getElementById('tvForm').addEventListener('submit', async (e) => {
                 modalCookieBox.innerText = "Refreshed Cookie:\n\n" + data.refreshed_cookie;
             }
         } else {
-            // FIX: Gracefully catch FastAPI 401/403/422 "detail" errors AND our custom "message" errors
             const errorText = data.detail || data.message || "An unknown error occurred.";
             
             modalIconStatic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
@@ -801,7 +845,6 @@ document.getElementById('tvForm').addEventListener('submit', async (e) => {
     }
 });
 </script>
-    
 
 </body>
 </html>
