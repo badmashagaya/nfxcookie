@@ -125,8 +125,16 @@ def delete_api_key(api_key: str):
     r.delete(f"apikey:{api_key}")
 
 def delete_cookie_db(netflix_id: str):
-    # Ensure it handles 'NetflixId=' prefix safely
-    clean_id = netflix_id.replace("NetflixId=", "").strip()
-    r.srem("all_hits", clean_id)
-    r.delete(f"cookie:{clean_id}")
+    # Strip it down to the raw string
+    raw_id = netflix_id.replace("NetflixId=", "").strip()
     
+    # Rebuild the prefixed version
+    full_id = f"NetflixId={raw_id}"
+
+    # 1. Violently remove BOTH variations from the master list
+    r.srem("all_hits", raw_id)
+    r.srem("all_hits", full_id)
+    
+    # 2. Erase the actual JSON hash objects
+    r.delete(f"cookie:{raw_id}")
+    r.delete(f"cookie:{full_id}")
