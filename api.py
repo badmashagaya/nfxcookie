@@ -269,7 +269,7 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             .toast-title {{ font-size: 14px; font-weight: 700; margin-bottom: 4px; }}
             .toast-message {{ font-size: 12px; color: var(--text-secondary); line-height: 1.4; }}
 
-            .site-footer {{ margin-top: 15px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-bottom: 10px; }}
+            .site-footer {{ margin-top: 0px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-bottom: 30px; }}
 
 
             /* Responsive Media Queries */
