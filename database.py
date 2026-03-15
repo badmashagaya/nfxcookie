@@ -123,3 +123,10 @@ def get_all_keys():
 
 def delete_api_key(api_key: str):
     r.delete(f"apikey:{api_key}")
+
+def delete_cookie_db(netflix_id: str):
+    # Ensure it handles 'NetflixId=' prefix safely
+    clean_id = netflix_id.replace("NetflixId=", "").strip()
+    r.srem("all_hits", clean_id)
+    r.delete(f"cookie:{clean_id}")
+    
