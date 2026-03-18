@@ -109,9 +109,10 @@ def parse_proxies_from_bytes(file_bytes: bytes) -> list:
 def get_public_ip(proxies):
     local_ip = "Unknown"
     try:
-        # ipify is incredibly lightweight and doesn't block Webshare proxies
-        resp = requests.get("http://api.ipify.org?format=json", timeout=5).json()
-        local_ip = resp.get('ip', 'Unknown')
+        # Plain text request -> NO JSON to decode, making JSONDecodeError impossible
+        resp = requests.get("https://api.ipify.org", timeout=5)
+        if resp.status_code == 200:
+            local_ip = resp.text.strip()
     except: 
         local_ip = "Unable to verify (Network Error)"
     
@@ -121,16 +122,26 @@ def get_public_ip(proxies):
         success = False
         last_err = ""
         
-        # Smart Test: Try up to 3 different proxies so one bad rotation doesn't fail the test
+        # Test up to 3 proxies to bypass any temporary Webshare dead-zones
         test_pool = random.sample(proxies, min(3, len(proxies)))
         
         for test_proxy in test_pool:
             try:
-                # Increased timeout to 15s to easily handle Webshare's initial hop delay
-                p_resp = requests.get("http://api.ipify.org?format=json", proxies=test_proxy, timeout=15).json()
-                proxy_info += f" | Proxy Verified IP: {p_resp.get('ip')}"
-                success = True
-                break  # If it succeeds, stop testing and report success!
+                # HTTPS prevents proxy injection, plain text prevents JSON errors
+                p_resp = requests.get("https://api.ipify.org", proxies=test_proxy, timeout=15)
+                
+                if p_resp.status_code == 200:
+                    ip_str = p_resp.text.strip()
+                    # Ensure we actually got an IP address, not an HTML block page
+                    if "." in ip_str and len(ip_str) < 20:
+                        proxy_info += f" | Proxy Verified IP: {ip_str}"
+                        success = True
+                        break
+                    else:
+                        last_err = "HTML Intercept"
+                else:
+                    last_err = f"HTTP {p_resp.status_code}"
+                    
             except Exception as e:
                 last_err = type(e).__name__
                 continue
@@ -139,6 +150,7 @@ def get_public_ip(proxies):
             proxy_info += f" | Proxy Verification: Failed ({last_err})"
             
     return local_ip, proxy_info
+
 
 
 # ==========================================
