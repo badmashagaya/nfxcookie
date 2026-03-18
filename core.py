@@ -109,26 +109,37 @@ def parse_proxies_from_bytes(file_bytes: bytes) -> list:
 def get_public_ip(proxies):
     local_ip = "Unknown"
     try:
-        resp = requests.get("http://ip-api.com/json/", timeout=5).json()
-        local_ip = f"{resp.get('query')} ({resp.get('country')})"
-    except: local_ip = "Unable to verify (Network Error)"
+        # ipify is incredibly lightweight and doesn't block Webshare proxies
+        resp = requests.get("http://api.ipify.org?format=json", timeout=5).json()
+        local_ip = resp.get('ip', 'Unknown')
+    except: 
+        local_ip = "Unable to verify (Network Error)"
     
     proxy_info = f"Proxies loaded: {len(proxies)}" if proxies else "No proxies used."
+    
     if proxies:
-        test_proxy = random.choice(proxies)
-        try:
-            # Increased timeout to 10s to account for Webshare's routing delay
-            p_resp = requests.get("http://ip-api.com/json/", proxies=test_proxy, timeout=10).json()
-            proxy_info += f" | Proxy Verified IP: {p_resp.get('query')} ({p_resp.get('country')})"
-        except Exception as e: 
+        success = False
+        last_err = ""
+        
+        # Smart Test: Try up to 3 different proxies so one bad rotation doesn't fail the test
+        test_pool = random.sample(proxies, min(3, len(proxies)))
+        
+        for test_proxy in test_pool:
             try:
-                # Fallback to myip.com if ip-api happens to fail
-                p_resp2 = requests.get("https://api.myip.com", proxies=test_proxy, timeout=10).json()
-                proxy_info += f" | Proxy Verified IP: {p_resp2.get('ip')} ({p_resp2.get('country')})"
-            except Exception as e2:
-                proxy_info += f" | Proxy Verification: Failed ({type(e2).__name__})"
+                # Increased timeout to 15s to easily handle Webshare's initial hop delay
+                p_resp = requests.get("http://api.ipify.org?format=json", proxies=test_proxy, timeout=15).json()
+                proxy_info += f" | Proxy Verified IP: {p_resp.get('ip')}"
+                success = True
+                break  # If it succeeds, stop testing and report success!
+            except Exception as e:
+                last_err = type(e).__name__
+                continue
+                
+        if not success:
+            proxy_info += f" | Proxy Verification: Failed ({last_err})"
             
     return local_ip, proxy_info
+
 
 # ==========================================
 # --- FLAWLESS COOKIE EXTRACTOR ---
