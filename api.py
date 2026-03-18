@@ -65,7 +65,7 @@ def verify_security(api_key: str = Depends(api_key_header)):
 # ==========================================
 # --- CENTRAL LOGGING SYSTEM ---
 # ==========================================
-def write_scan_log(scan_type: str, total_checked: int, stats: dict, proxy_status: str):
+def write_scan_log(scan_type: str, total_checked: int, stats: dict, proxy_status: str, detailed_logs: list = None):
     try:
         ist = pytz.timezone('Asia/Kolkata')
         now_str = datetime.datetime.now(ist).strftime('%Y-%m-%d %I:%M:%S %p IST')
@@ -103,6 +103,14 @@ def write_scan_log(scan_type: str, total_checked: int, stats: dict, proxy_status
                 log.append(f" - {q}: {c}")
             log.append("==========================================")
 
+        # Append the detailed request log!
+        if detailed_logs:
+            log.append("\n==========================================")
+            log.append("           DETAILED REQUEST LOG           ")
+            log.append("==========================================")
+            log.extend(detailed_logs)
+            log.append("==========================================")
+
         # "w" completely overwrites the file every time
         with open("last_scan.log", "w", encoding="utf-8") as f:
             f.write("\n".join(log) + "\n")
@@ -136,6 +144,7 @@ def revalidate_db_task():
         print_lock = threading.Lock()
         guid_lock = threading.Lock()
         processed_guids = set()
+        detailed_logs = []
         
         def db_cleanup_hook(data): pass 
         def db_delete_hook(netflix_id): database.delete_cookie_db(netflix_id)
@@ -147,22 +156,21 @@ def revalidate_db_task():
                 with open("rescan_proxies.txt", "rb") as f:
                     worker_proxies = core.parse_proxies_from_bytes(f.read())
             else:
-                # Fallback to the main proxy.txt if the custom rescan one is missing
                 worker_proxies = PROXIES
 
         threads = []
         db_threads = min(20, max(5, len(all_ids) // 10))
         for _ in range(db_threads):
-            t = threading.Thread(target=core.check_worker, args=(q, print_lock, stats, worker_proxies, processed_guids, guid_lock, db_cleanup_hook, db_delete_hook))
+            t = threading.Thread(target=core.check_worker, args=(q, print_lock, stats, worker_proxies, processed_guids, guid_lock, db_cleanup_hook, db_delete_hook, detailed_logs))
             t.daemon = True
             t.start()
             threads.append(t)
             
         q.join()
         
-        # Pull final network status and generate the log!
+        # Pull final network status and generate the full log!
         local_ip, proxy_status = core.get_public_ip(worker_proxies)
-        write_scan_log("Database Rescan", len(all_ids), stats, proxy_status)
+        write_scan_log("Database Rescan", len(all_ids), stats, proxy_status, detailed_logs)
         
         proxy_mode = "PROXIES" if USE_PROXIES_RESCAN else "DIRECT IP"
         print(f"[*] Rescan Complete ({proxy_mode}) | Alive: {stats['hits']} | Dead: {stats['dead']} | Hold: {stats['holds']}")
@@ -216,7 +224,6 @@ def update_rescan_config(
     if use_proxies is not None:
         USE_PROXIES_RESCAN = (use_proxies.lower() == "true")
 
-    # Save permanently to Redis!
     database.set_rescan_config(CURRENT_SCHEDULE, USE_PROXIES_RESCAN)
     
     return {"success": True, "message": "Configuration saved perfectly."}
@@ -294,7 +301,6 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             .btn-outline {{ width: 100%; height: 54px; border-radius: 14px; background: transparent; color: var(--accent); border: 1px solid var(--accent); font-size: 15px; font-weight: 700; font-family: 'Nexa', sans-serif; cursor: pointer; transition: 0.2s; margin-bottom: 20px; }}
             .btn-outline:active {{ transform: scale(0.96); background: rgba(0, 136, 255, 0.1); }}
 
-            /* Sleek Apple Toggle Switch */
             .toggle-container {{ width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--input-bg); padding: 16px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 20px; }}
             .toggle-label {{ font-size: 13px; font-weight: 700; color: #fff; }}
             .toggle-sub {{ font-size: 11px; font-weight: 400; color: var(--text-secondary); margin-top: 4px; }}
@@ -305,7 +311,6 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             input:checked + .slider {{ background-color: #34c759; }}
             input:checked + .slider:before {{ transform: translateX(20px); }}
 
-            /* Proxy File Upload UI */
             .file-upload-wrapper {{ position: relative; border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; height: 70px; background: rgba(0,0,0,0.2); transition: all 0.3s ease; cursor: pointer; display: flex; justify-content: center; align-items: center; margin-bottom: 10px; width: 100%; }}
             .file-upload-wrapper:hover {{ border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05); }}
             .file-upload-wrapper input[type="file"] {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2; }}
@@ -314,7 +319,6 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             
             .proxy-active-state {{ width: 100%; background: rgba(52, 199, 89, 0.08); border: 1px solid rgba(52, 199, 89, 0.2); border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }}
 
-            /* Beautiful Toast Notifications */
             .toast-container {{ position: fixed; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; }}
             .toast-card {{ background: #1c1c1e; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px 20px; color: #fff; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); display: flex; align-items: flex-start; gap: 12px; }}
             .toast-card.show {{ transform: translateX(0); }}
@@ -323,10 +327,8 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             .toast-title {{ font-size: 14px; font-weight: 700; margin-bottom: 4px; }}
             .toast-message {{ font-size: 12px; color: var(--text-secondary); line-height: 1.4; }}
 
-            .site-footer {{ margin-top: 0px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-top: 30px; }}
+            .site-footer { margin-top: 0px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-top: 30px; }
 
-
-            /* Responsive Media Queries */
             @media (min-width: 420px) {{
                 .import-card {{ padding: 40px 30px; }}
             }}
@@ -451,13 +453,11 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
                         badge.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> System is Idle`;
                     }}
                     
-                    // UI Updates for inputs (only if user isn't actively typing)
                     if (document.activeElement.id !== 'scheduleInput') {{
                         document.getElementById('scheduleInput').value = data.schedule;
                         document.getElementById('proxyToggle').checked = data.use_proxies;
                     }}
 
-                    // Proxy Manager Visibility Logic
                     const proxyManager = document.getElementById('proxyManager');
                     const proxyUpload = document.getElementById('proxyUploadState');
                     const proxyActive = document.getElementById('proxyActiveState');
@@ -597,6 +597,7 @@ async def upload_file(
         print_lock = threading.Lock()
         guid_lock = threading.Lock()
         processed_guids = set() 
+        detailed_logs = []
         
         def db_save_hook(data):
             if req_plan and req_plan.lower() != data["plan"].lower(): return
@@ -612,7 +613,7 @@ async def upload_file(
         else: num_threads = 50
             
         for _ in range(num_threads):
-            t = threading.Thread(target=core.check_worker, args=(q, print_lock, stats, request_proxies, processed_guids, guid_lock, db_save_hook))
+            t = threading.Thread(target=core.check_worker, args=(q, print_lock, stats, request_proxies, processed_guids, guid_lock, db_save_hook, None, detailed_logs))
             t.daemon = True
             t.start()
             threads.append(t)
@@ -623,9 +624,9 @@ async def upload_file(
 
         q.join()
         
-        # Pull final network status and generate the log!
+        # Pull final network status and generate the full log!
         local_ip, proxy_status = core.get_public_ip(request_proxies)
-        write_scan_log("Manual File Upload", num_cookies, stats, proxy_status)
+        write_scan_log("Manual File Upload", num_cookies, stats, proxy_status, detailed_logs)
         
         upload_tasks[task_id]["checked"] = num_cookies
         upload_tasks[task_id]["status"] = "completed"
