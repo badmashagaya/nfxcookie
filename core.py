@@ -331,6 +331,7 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
     
     return "\n".join(out), canonical_plan, quality, is_subscribed, is_on_hold, db_data
 
+
 # ==========================================
 # --- EXACT THREAD WORKER WITH DETAILED LOGS ---
 # ==========================================
@@ -354,6 +355,7 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
         success = False
         status_for_log = "ERROR"
         proxy_host_for_log = "DIRECT IP"
+        last_error_detail = ""  # <--- NEW: Tracks the exact error code
 
         for attempt in range(max_retries):
             proxy = None
@@ -365,10 +367,10 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                     proxy = proxies[0]
                 last_proxy = proxy
                 
-                # Extract clean IP/Host for the Log file (hides your proxy user/pass)
+                # Extract HOST:PORT for the Log file (hides your proxy user/pass)
                 try:
                     p_url = urlparse(proxy['http'])
-                    proxy_host_for_log = p_url.hostname
+                    proxy_host_for_log = f"{p_url.hostname}:{p_url.port}" # <--- FIX: Added the Port!
                 except:
                     proxy_host_for_log = "PROXY"
 
@@ -383,8 +385,12 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                 response = session.get('https://www.netflix.com/YourAccount', allow_redirects=True, proxies=proxy, timeout=15)
                 
                 if response.status_code in retryable_status_codes:
-                    status_for_log = f"RETRY ({response.status_code})"
+                    status_for_log = "RETRY"
+                    last_error_detail = f"HTTP {response.status_code}" # <--- Tracks Rate Limits
                     continue 
+
+                # If it succeeds without error, clear the error tracker
+                last_error_detail = ""
 
                 if "login" in response.url.lower():
                     status_for_log = "DEAD"
@@ -427,7 +433,8 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                 break 
 
             except (requests.exceptions.ProxyError, requests.RequestException) as e:
-                status_for_log = f"ERROR ({type(e).__name__})"
+                status_for_log = "ERROR"
+                last_error_detail = type(e).__name__ # <--- Tracks ProxyError, Timeout, etc.
                 continue 
 
         if not success:
@@ -435,12 +442,15 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
             with print_lock:
                 stats["errors"] += 1
 
-        # Save to Detailed Log
+        # Save to Detailed Log with Error Attachment
         if detailed_logs is not None:
+            err_str = f" | Error: {last_error_detail}" if last_error_detail else ""
             with print_lock:
-                detailed_logs.append(f"[{status_for_log.ljust(6)}] ID: {clean_id[:25]:<25}... | Proxy: {proxy_host_for_log}")
+                detailed_logs.append(f"[{status_for_log.ljust(6)}] ID: {clean_id[:25]:<25}... | Proxy: {proxy_host_for_log}{err_str}")
 
         q.task_done()
+        
+
 
 def _deep_find_key(obj, target_key):
     if isinstance(obj, dict):
