@@ -94,11 +94,9 @@ def load_proxies():
                 if proxy: proxies.append(proxy)
     return proxies
 
-# --- NEW: DYNAMIC PROXY PARSER ---
 def parse_proxies_from_bytes(file_bytes: bytes) -> list:
     proxies = []
     try:
-        # utf-8-sig natively destroys the Windows invisible Byte Order Mark!
         text_content = file_bytes.decode('utf-8-sig', errors='ignore')
         for line in text_content.splitlines():
             proxy = _parse_proxy_line(line)
@@ -107,22 +105,28 @@ def parse_proxies_from_bytes(file_bytes: bytes) -> list:
         pass
     return proxies
 
+# --- UPGRADED ROBUST IP CHECKER FOR WEBSHARE ---
 def get_public_ip(proxies):
     local_ip = "Unknown"
     try:
-        resp = requests.get("https://api.myip.com", timeout=5).json()
-        local_ip = f"{resp.get('ip')} ({resp.get('country')})"
+        resp = requests.get("http://ip-api.com/json/", timeout=5).json()
+        local_ip = f"{resp.get('query')} ({resp.get('country')})"
     except: local_ip = "Unable to verify (Network Error)"
     
     proxy_info = f"Proxies loaded: {len(proxies)}" if proxies else "No proxies used."
     if proxies:
         test_proxy = random.choice(proxies)
         try:
-            p_resp = requests.get("https://api.myip.com", proxies=test_proxy, timeout=5).json()
-            proxy_info += f" | Proxy Verified IP: {p_resp.get('ip')} ({p_resp.get('country')})"
+            # Increased timeout to 10s to account for Webshare's routing delay
+            p_resp = requests.get("http://ip-api.com/json/", proxies=test_proxy, timeout=10).json()
+            proxy_info += f" | Proxy Verified IP: {p_resp.get('query')} ({p_resp.get('country')})"
         except Exception as e: 
-            # Now prints the EXACT reason the proxy failed (e.g., Timeout, ProxyError)
-            proxy_info += f" | Proxy Verification: Failed ({type(e).__name__})"
+            try:
+                # Fallback to myip.com if ip-api happens to fail
+                p_resp2 = requests.get("https://api.myip.com", proxies=test_proxy, timeout=10).json()
+                proxy_info += f" | Proxy Verified IP: {p_resp2.get('ip')} ({p_resp2.get('country')})"
+            except Exception as e2:
+                proxy_info += f" | Proxy Verification: Failed ({type(e2).__name__})"
             
     return local_ip, proxy_info
 
@@ -148,9 +152,6 @@ def extract_ids_from_bytes(file_bytes: bytes, filename: str) -> set:
         except: pass
     return unique_ids
 
-# ==========================================
-# --- EXACT HELPER FUNCTIONS ---
-# ==========================================
 def js_hex_to_json_escapes(s: str) -> str: return re.sub(r"\\x([0-9A-Fa-f]{2})", lambda m: "\\u00" + m.group(1), s)
 
 def extract_balanced_object(text: str, start_idx: int) -> Optional[str]:
