@@ -11,6 +11,7 @@ from queue import Queue
 import uuid
 import time
 import os
+import datetime
 
 import core
 import database
@@ -62,6 +63,54 @@ def verify_security(api_key: str = Depends(api_key_header)):
 
 
 # ==========================================
+# --- CENTRAL LOGGING SYSTEM ---
+# ==========================================
+def write_scan_log(scan_type: str, total_checked: int, stats: dict, proxy_status: str):
+    try:
+        ist = pytz.timezone('Asia/Kolkata')
+        now_str = datetime.datetime.now(ist).strftime('%Y-%m-%d %I:%M:%S %p IST')
+        
+        log = [
+            "==========================================",
+            "          OOR LAST SCAN LOG               ",
+            "==========================================",
+            f"Date & Time : {now_str}",
+            f"Scan Type   : {scan_type}",
+            f"Network     : {proxy_status}",
+            "------------------------------------------",
+            "              SUMMARY                     ",
+            "------------------------------------------",
+            f"Total Checked : {total_checked}",
+            f"Hits (Alive)  : {stats.get('hits', 0)}",
+            f"Dead/Invalid  : {stats.get('dead', 0)}",
+            f"On Hold       : {stats.get('holds', 0)}",
+            f"Free Accounts : {stats.get('free', 0)}",
+            f"Errors/Blocks : {stats.get('errors', 0)}",
+            f"Duplicates    : {stats.get('duplicates', 0)}",
+            f"Unknown       : {stats.get('unknown', 0)}",
+            "------------------------------------------"
+        ]
+        
+        if stats.get('plans'):
+            log.append("           PLANS (HITS)           ")
+            for p, c in stats['plans'].items():
+                log.append(f" - {p}: {c}")
+            log.append("------------------------------------------")
+            
+        if stats.get('qualities'):
+            log.append("         QUALITIES (HITS)         ")
+            for q, c in stats['qualities'].items():
+                log.append(f" - {q}: {c}")
+            log.append("==========================================")
+
+        # "w" completely overwrites the file every time
+        with open("last_scan.log", "w", encoding="utf-8") as f:
+            f.write("\n".join(log) + "\n")
+    except Exception as e:
+        print(f"Log Write Error: {e}")
+
+
+# ==========================================
 # --- BACKGROUND AUTO-SCANNER ENGINE ---
 # ==========================================
 IS_RESCANNING = False
@@ -110,6 +159,11 @@ def revalidate_db_task():
             threads.append(t)
             
         q.join()
+        
+        # Pull final network status and generate the log!
+        local_ip, proxy_status = core.get_public_ip(worker_proxies)
+        write_scan_log("Database Rescan", len(all_ids), stats, proxy_status)
+        
         proxy_mode = "PROXIES" if USE_PROXIES_RESCAN else "DIRECT IP"
         print(f"[*] Rescan Complete ({proxy_mode}) | Alive: {stats['hits']} | Dead: {stats['dead']} | Hold: {stats['holds']}")
     
@@ -568,7 +622,11 @@ async def upload_file(
             time.sleep(0.5)
 
         q.join()
+        
+        # Pull final network status and generate the log!
         local_ip, proxy_status = core.get_public_ip(request_proxies)
+        write_scan_log("Manual File Upload", num_cookies, stats, proxy_status)
+        
         upload_tasks[task_id]["checked"] = num_cookies
         upload_tasks[task_id]["status"] = "completed"
         upload_tasks[task_id]["eta"] = 0
