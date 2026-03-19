@@ -131,6 +131,27 @@ def delete_cookie_db(netflix_id: str):
     # Rebuild the prefixed version
     full_id = f"NetflixId={raw_id}"
 
+    # --- NEW: Fetch existing data first to clean up the filters! ---
+    existing_data = r.get(f"cookie:{full_id}")
+    if not existing_data:
+        existing_data = r.get(f"cookie:{raw_id}")
+
+    if existing_data:
+        try:
+            data = json.loads(existing_data)
+            # Safely remove the ID from all 3 filter categories
+            if data.get("plan"): 
+                r.srem(f"filter:plan:{data['plan']}", full_id)
+                r.srem(f"filter:plan:{data['plan']}", raw_id)
+            if data.get("quality"): 
+                r.srem(f"filter:quality:{data['quality']}", full_id)
+                r.srem(f"filter:quality:{data['quality']}", raw_id)
+            if data.get("language"): 
+                r.srem(f"filter:language:{data['language']}", full_id)
+                r.srem(f"filter:language:{data['language']}", raw_id)
+        except Exception as e:
+            print(f"Filter cleanup error: {e}")
+
     # 1. Violently remove BOTH variations from the master list
     r.srem("all_hits", raw_id)
     r.srem("all_hits", full_id)
@@ -138,6 +159,7 @@ def delete_cookie_db(netflix_id: str):
     # 2. Erase the actual JSON hash objects
     r.delete(f"cookie:{raw_id}")
     r.delete(f"cookie:{full_id}")
+
 
 # --- SYSTEM CONFIGURATION ---
 def set_rescan_config(schedule: str, use_proxies: bool, auto_rescan: bool = True):
