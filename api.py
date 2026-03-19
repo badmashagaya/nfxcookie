@@ -125,8 +125,9 @@ IS_RESCANNING = False
 
 # Fetch the permanently saved config from Redis!
 db_conf = database.get_rescan_config()
-CURRENT_SCHEDULE = db_conf["schedule"]
-USE_PROXIES_RESCAN = db_conf["use_proxies"]
+CURRENT_SCHEDULE = db_conf.get("schedule", "0,8,16")
+USE_PROXIES_RESCAN = db_conf.get("use_proxies", True)
+AUTO_RESCAN_ENABLED = db_conf.get("auto_rescan", True)
 
 def revalidate_db_task():
     global IS_RESCANNING, USE_PROXIES_RESCAN
@@ -181,6 +182,11 @@ def revalidate_db_task():
 ist_tz = pytz.timezone('Asia/Kolkata')
 scheduler = BackgroundScheduler(timezone=ist_tz)
 scheduler.add_job(revalidate_db_task, 'cron', hour=CURRENT_SCHEDULE, id='rescan_job', replace_existing=True)
+
+# --- PAUSE THE JOB IF DISABLED ON STARTUP ---
+if not AUTO_RESCAN_ENABLED:
+    scheduler.pause_job('rescan_job')
+
 scheduler.start()
 
 
@@ -193,7 +199,8 @@ def get_rescan_status(user: str = Depends(verify_admin)):
         "is_running": IS_RESCANNING, 
         "schedule": CURRENT_SCHEDULE,
         "use_proxies": USE_PROXIES_RESCAN,
-        "has_proxies": os.path.exists("rescan_proxies.txt")
+        "has_proxies": os.path.exists("rescan_proxies.txt"),
+        "auto_rescan": AUTO_RESCAN_ENABLED
     }
 
 @app.post("/api/rescan/now")
@@ -208,9 +215,10 @@ def trigger_rescan_now(background_tasks: BackgroundTasks, user: str = Depends(ve
 def update_rescan_config(
     hours: Optional[str] = Form(None), 
     use_proxies: Optional[str] = Form(None), 
+    auto_rescan: Optional[str] = Form(None),
     user: str = Depends(verify_admin)
 ):
-    global CURRENT_SCHEDULE, USE_PROXIES_RESCAN
+    global CURRENT_SCHEDULE, USE_PROXIES_RESCAN, AUTO_RESCAN_ENABLED
     
     if hours is not None:
         clean_hours = "".join(c for c in hours if c.isdigit() or c == ",")
@@ -218,13 +226,25 @@ def update_rescan_config(
         try:
             scheduler.add_job(revalidate_db_task, 'cron', hour=clean_hours, id='rescan_job', replace_existing=True)
             CURRENT_SCHEDULE = clean_hours
+            if not AUTO_RESCAN_ENABLED:
+                scheduler.pause_job('rescan_job')
         except Exception as e:
             return {"success": False, "message": f"Failed to update schedule: {str(e)}"}
             
     if use_proxies is not None:
         USE_PROXIES_RESCAN = (use_proxies.lower() == "true")
 
-    database.set_rescan_config(CURRENT_SCHEDULE, USE_PROXIES_RESCAN)
+    if auto_rescan is not None:
+        AUTO_RESCAN_ENABLED = (auto_rescan.lower() == "true")
+        if AUTO_RESCAN_ENABLED:
+            try: scheduler.resume_job('rescan_job')
+            except: pass
+        else:
+            try: scheduler.pause_job('rescan_job')
+            except: pass
+
+    # Save permanently to Redis!
+    database.set_rescan_config(CURRENT_SCHEDULE, USE_PROXIES_RESCAN, AUTO_RESCAN_ENABLED)
     
     return {"success": True, "message": "Configuration saved perfectly."}
 
@@ -361,6 +381,18 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
                 <div style="width: 100%; height: 1px; background: var(--border); margin: 10px 0 25px 0;"></div>
                 
                 <div style="width: 100%;">
+                    
+                    <div class="toggle-container" style="margin-bottom: 10px;">
+                        <div>
+                            <div class="toggle-label">Enable Auto-Schedule</div>
+                            <div class="toggle-sub">Run background rescans automatically</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="autoRescanToggle" onchange="updateAutoRescanSetting()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
                     <div class="toggle-container">
                         <div>
                             <div class="toggle-label">Use Custom Proxies</div>
@@ -455,6 +487,7 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
                     if (document.activeElement.id !== 'scheduleInput') {{
                         document.getElementById('scheduleInput').value = data.schedule;
                         document.getElementById('proxyToggle').checked = data.use_proxies;
+                        document.getElementById('autoRescanToggle').checked = data.auto_rescan;
                     }}
 
                     const proxyManager = document.getElementById('proxyManager');
@@ -501,6 +534,19 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
                 try {{
                     await fetch('/api/rescan/config', {{ method: 'POST', body: formData }});
                     checkStatus();
+                }} catch(e) {{ showToast('Error', 'Network Error', 'error'); }}
+            }}
+
+            async function updateAutoRescanSetting() {{
+                const isChecked = document.getElementById('autoRescanToggle').checked;
+                const formData = new FormData();
+                formData.append("auto_rescan", isChecked);
+                
+                try {{
+                    await fetch('/api/rescan/config', {{ method: 'POST', body: formData }});
+                    checkStatus();
+                    if(isChecked) showToast('Enabled', 'Auto-schedule is now ON.', 'success');
+                    else showToast('Disabled', 'Auto-schedule is now OFF.', 'info');
                 }} catch(e) {{ showToast('Error', 'Network Error', 'error'); }}
             }}
 
