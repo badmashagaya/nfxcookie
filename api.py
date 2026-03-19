@@ -265,7 +265,6 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             }}
 
             .main-content {{ display: flex; align-items: center; justify-content: center; width: 100%; }}
-
             
             .import-card {{
                 background: var(--card-bg); border-radius: 20px; padding: 30px 20px; width: 100%; max-width: 380px; position: relative;
@@ -327,7 +326,7 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
             .toast-title {{ font-size: 14px; font-weight: 700; margin-bottom: 4px; }}
             .toast-message {{ font-size: 12px; color: var(--text-secondary); line-height: 1.4; }}
 
-            .site-footer { margin-top: 0px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-top: 30px; }
+            .site-footer {{ margin-top: 0px; font-size: 13px; opacity: 0.7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif; font-weight: 400; color: var(--text-secondary); text-align: center; width: 100%; padding-top: 30px; }}
 
             @media (min-width: 420px) {{
                 .import-card {{ padding: 40px 30px; }}
