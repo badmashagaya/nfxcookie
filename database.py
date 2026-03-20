@@ -28,35 +28,39 @@ def save_cookie_db(data: dict):
         print(f"Redis Save Error: {e}")
 
 def get_filtered_cookies(plan=None, quality=None, language=None):
-    # 1. Build the list of filters to apply
-    sets_to_intersect = ["all_hits"]
-    if plan: sets_to_intersect.append(f"filter:plan:{plan}")
-    if quality: sets_to_intersect.append(f"filter:quality:{quality}")
-    if language: sets_to_intersect.append(f"filter:language:{language}")
+    try:
+        # Safely prevents 500 Internal Error if DB is empty or disconnected
+        if not r.exists("all_hits"):
+            return []
+            
+        sets_to_intersect = ["all_hits"]
+        if plan: sets_to_intersect.append(f"filter:plan:{plan}")
+        if quality: sets_to_intersect.append(f"filter:quality:{quality}")
+        if language: sets_to_intersect.append(f"filter:language:{language}")
+        
+        valid_ids = r.sinter(*sets_to_intersect)
+        if not valid_ids: 
+            return []
+        
+        # --- THE 100X SPEED FIX: MGET ---
+        # Fetches all matching cookies in exactly ONE network request
+        keys_to_fetch = [f"cookie:{nid}" for nid in valid_ids]
+        raw_data_list = r.mget(keys_to_fetch)
+        
+        results = []
+        for raw in raw_data_list:
+            if raw:
+                try: 
+                    results.append(json.loads(raw))
+                except: 
+                    pass
+                    
+        return results
+        
+    except Exception as e:
+        print(f"Redis Fetch Error: {e}")
+        return []  # Return an empty list so the API doesn't crash on the frontend
 
-    # 2. Get the matching IDs (intersect the sets)
-    if len(sets_to_intersect) == 1:
-        matching_ids = r.smembers("all_hits")
-    else:
-        matching_ids = r.sinter(*sets_to_intersect)
-
-    if not matching_ids:
-        return []
-
-    # 3. THE 100X SPEED FIX: Use MGET to fetch ALL cookies in ONE single request!
-    keys_to_fetch = [f"cookie:{nid}" for nid in matching_ids]
-    raw_data_list = r.mget(keys_to_fetch)
-
-    results = []
-    # 4. Parse the results
-    for raw_data in raw_data_list:
-        if raw_data:
-            try:
-                results.append(json.loads(raw_data))
-            except Exception:
-                pass
-
-    return results
 
 
 def delete_cookie(nid: str):
