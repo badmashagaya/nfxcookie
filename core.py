@@ -285,6 +285,22 @@ def analyze_plan_and_language(raw_plan):
         if normalized == key or key in normalized: return data[0], data[1]
     return raw_plan.title(), f"Original: {raw_plan}"
 
+# --- HELPER: Safely hunts down nested JSON keys ---
+def _deep_find_key(obj, target_key):
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if key == target_key and value: return value
+            result = _deep_find_key(value, target_key)
+            if result: return result
+    elif isinstance(obj, list):
+        for item in obj:
+            result = _deep_find_key(item, target_key)
+            if result: return result
+    return None
+
+# ==========================================
+# --- EXACT EXTRACTION LOGIC ---
+# ==========================================
 def perform_extraction(html: str, original_id: str, processed_guids: set, guid_lock: threading.Lock):
     gql_obj = find_object_after_marker(html, '"graphql":')
     rc_obj = find_object_after_marker(html, "netflix.reactContext")
@@ -312,7 +328,20 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
         processed_guids.add(original_id)
 
     raw_plan_name = plan_f.get("localizedPlanName", {}).get("value") or get_path(growth, ["currentPlan", "plan", "name"]) or ""
-    canonical_plan, display_lang = analyze_plan_and_language(raw_plan_name)
+    canonical_plan, fallback_lang = analyze_plan_and_language(raw_plan_name)
+    
+    # --- NEW: Extract Exact Native Language from userLocale! ---
+    display_lang = None
+    user_locale_obj = _deep_find_key(rc_root, "userLocale")
+    if user_locale_obj and isinstance(user_locale_obj, dict):
+        loc_data = user_locale_obj.get("locale", {})
+        # Tries to get 'Türkçe (Türkiye)', falls back to 'Türkçe'
+        display_lang = loc_data.get("displayName") or loc_data.get("fallbackDisplayName")
+        
+    # If the userLocale object was completely missing, use our original dictionary guess
+    if not display_lang:
+        display_lang = fallback_lang
+
     quality = plan_f.get("videoQuality", {}).get("value") or "Unknown"
 
     membership_status = growth.get("membershipStatus")
@@ -374,6 +403,7 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
     }
     
     return "\n".join(out), canonical_plan, quality, is_subscribed, is_on_hold, db_data
+    
 
 
 # ==========================================
@@ -500,17 +530,6 @@ def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: lis
         
 
 
-def _deep_find_key(obj, target_key):
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            if key == target_key and value: return value
-            result = _deep_find_key(value, target_key)
-            if result: return result
-    elif isinstance(obj, list):
-        for item in obj:
-            result = _deep_find_key(item, target_key)
-            if result: return result
-    return None
 
 def find_auth_in_react_context(html):
     patterns = [
