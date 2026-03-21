@@ -147,8 +147,15 @@ def revalidate_db_task():
         processed_guids = set()
         detailed_logs = []
         
-        def db_cleanup_hook(data): pass 
-        def db_delete_hook(netflix_id): database.delete_cookie_db(netflix_id)
+        def db_cleanup_hook(data): 
+            # 1. Violently delete the old entry to erase it from any old/incorrect filter folders
+            database.delete_cookie_db(data['netflix_id'])
+            # 2. Re-save the freshly extracted, 100% verified data into the correct filter folders
+            database.save_cookie_db(data)
+            
+        def db_delete_hook(netflix_id): 
+            database.delete_cookie_db(netflix_id)
+
 
         # --- DYNAMIC PERSISTENT PROXY LOADER ---
         worker_proxies = []
