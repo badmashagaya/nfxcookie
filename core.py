@@ -298,6 +298,55 @@ def _deep_find_key(obj, target_key):
             if result: return result
     return None
 
+
+# --- NORMALIZES NETFLIX NATIVE LANGUAGES TO STANDARD ENGLISH ---
+def normalize_language(native_lang: str, fallback_lang: str) -> str:
+    if not native_lang:
+        return fallback_lang
+        
+    lang_lower = native_lang.lower()
+    
+    # Comprehensive map of Netflix Native Names -> Standard English Dropdown Names
+    language_map = {
+        "türkçe": "Turkish",
+        "español": "Spanish",
+        "tiếng việt": "Vietnamese",
+        "français": "French",
+        "português": "Portuguese",
+        "polski": "Polish",
+        "العربية": "Arabic",
+        "ไทย": "Thai",
+        "bahasa indonesia": "Indonesian",
+        "italiano": "Italian",
+        "deutsch": "German",
+        "nederlands": "Dutch",
+        "हिन्दी": "Hindi",
+        "日本語": "Japanese",
+        "한국어": "Korean",
+        "english": "English",
+        "suomi": "Finnish",
+        "svenska": "Swedish",
+        "norsk": "Norwegian",
+        "dansk": "Danish",
+        "română": "Romanian",
+        "magyar": "Hungarian",
+        "čeština": "Czech",
+        "ελληνικά": "Greek",
+        "עברית": "Hebrew",
+        "filipino": "Filipino",
+        "bahasa melayu": "Malay",
+        "русский": "Russian",
+        "українська": "Ukrainian",
+        "中文": "Chinese"
+    }
+    
+    for native_key, standard_name in language_map.items():
+        if native_key in lang_lower:
+            return standard_name
+            
+    # If it's a completely new/unknown language, return the native string
+    return native_lang
+    
 # ==========================================
 # --- EXACT EXTRACTION LOGIC ---
 # ==========================================
@@ -330,17 +379,15 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
     raw_plan_name = plan_f.get("localizedPlanName", {}).get("value") or get_path(growth, ["currentPlan", "plan", "name"]) or ""
     canonical_plan, fallback_lang = analyze_plan_and_language(raw_plan_name)
     
-    # --- NEW: Extract Exact Native Language from userLocale! ---
-    display_lang = None
+    # --- NEW: Extract Exact Native Language & Normalize for UI/API ---
+    raw_display_lang = None
     user_locale_obj = _deep_find_key(rc_root, "userLocale")
     if user_locale_obj and isinstance(user_locale_obj, dict):
         loc_data = user_locale_obj.get("locale", {})
-        # Tries to get 'Türkçe (Türkiye)', falls back to 'Türkçe'
-        display_lang = loc_data.get("displayName") or loc_data.get("fallbackDisplayName")
+        raw_display_lang = loc_data.get("displayName") or loc_data.get("fallbackDisplayName")
         
-    # If the userLocale object was completely missing, use our original dictionary guess
-    if not display_lang:
-        display_lang = fallback_lang
+    # Pass it through our translator so "Türkçe (Türkiye)" becomes "Turkish"
+    display_lang = normalize_language(raw_display_lang, fallback_lang)
 
     quality = plan_f.get("videoQuality", {}).get("value") or "Unknown"
 
