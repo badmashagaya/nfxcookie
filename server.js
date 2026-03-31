@@ -6,7 +6,7 @@ const app = express();
 
 // --- Configuration (Set these in Render's Environment Variables) ---
 const PORT = process.env.PORT || 3000;
-const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://194.242.56.38:8888/';
+const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://187.127.141.77:8888/';
 const OWNER_API_KEY = process.env.OWNER_API_KEY || 'OTTONRENT';
 
 // 1. Serve your index.html safely to the browser
