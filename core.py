@@ -12,9 +12,12 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import unquote, urlparse
 import requests
+import urllib3
 
 # Import the new modular payload parser
 import payload_parser
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ==========================================
 # --- EXACT PROXY SUPPORT FROM NFX_LIVE_FAST ---
@@ -480,34 +483,67 @@ def find_auth_in_html(html):
         if m: return unquote(m.group(1))
     return None
 
+
+
+
 def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tuple:
     clean_id = netflix_id.replace("NetflixId=", "").strip()
-    session = requests.Session()
     
-    stealth_headers = get_random_headers()
+    # --- STRICT PROXY ENFORCEMENT ---
+    active_proxies = []
+    
+    # 1. Dynamically load from rescan_proxies.txt first
+    if os.path.exists("rescan_proxies.txt"):
+        try:
+            with open("rescan_proxies.txt", "rb") as f:
+                active_proxies = parse_proxies_from_bytes(f.read())
+        except Exception as e:
+            print(f"[!] Error reading rescan_proxies.txt: {e}")
+            
+    # 2. Fallback to API base proxies if the rescan file is missing
+    if not active_proxies and proxies:
+        active_proxies = proxies
+        
+    # 3. Hard Abort if no proxies exist
+    if not active_proxies:
+        print("\n[!] FATAL: No proxies found. TV Login aborted to protect server IP.")
+        return False, "System Error: No proxies available! Proxy usage is strictly enforced.", netflix_id
+        
+    # 4. Select the proxy for this session
+    proxy = random.choice(active_proxies)
+    proxy_str = proxy['http']
 
-    headers = {
-        "authority":       "www.netflix.com",
-        "accept":          stealth_headers["Accept"],
-        "accept-language": stealth_headers["Accept-Language"],
-        "user-agent":      stealth_headers["User-Agent"],
-    }
+    # --- SESSION INITIALIZATION ---
+    session = requests.Session()
+    stealth_headers = get_random_headers()
+    session.headers.update(stealth_headers)
     
-    session.headers.update(headers)
+    # Isolate the session state (Only inject NetflixId)
     session.cookies.set("NetflixId", clean_id, domain=".netflix.com")
-    proxy = random.choice(proxies) if proxies else None
+    
+    print(f"\n[TV LOGIN INIT] ID: {clean_id[:15]}... | Code: {tv_code}")
+    print(f"[*] Enforced Proxy: {proxy_str}")
+    print("[1/4] Session established.")
 
     try:
-        session.get("https://www.netflix.com/", proxies=proxy, timeout=15)
-        refreshed_id = session.cookies.get("NetflixId") or clean_id
-        refreshed_cookie_string = f"NetflixId={refreshed_id}"
+        print("[2/4] Executing GET /tv8...")
+        res_tv8 = session.get("https://www.netflix.com/tv8", proxies=proxy, timeout=15, verify=False)
+        print(f"      -> HTTP {res_tv8.status_code}")
+        
+        if res_tv8.status_code != 200:
+            print(f"      -> [!] FAILED: Proxy or IP blocked by Netflix.")
+            return False, f"Network Error: Proxy Blocked (HTTP {res_tv8.status_code}). Please try again.", netflix_id
 
-        res_tv8 = session.get("https://www.netflix.com/tv8", proxies=proxy, timeout=15)
+        # Extract dynamic authentication token
         auth_url = find_auth_in_react_context(res_tv8.text)
-        if not auth_url: auth_url = find_auth_in_html(res_tv8.text)
+        if not auth_url: 
+            auth_url = find_auth_in_html(res_tv8.text)
             
         if not auth_url:
-            return False, "Failed to extract dynamic authURL.", refreshed_cookie_string
+            print("      -> [!] FAILED: Could not locate authURL.")
+            return False, "Failed to connect to the TV endpoint. Account likely logged out.", netflix_id
+
+        print(f"[3/4] Successfully extracted authURL: {auth_url[:20]}...")
 
         post_data = {
             "flow":                  "websiteSignUp",
@@ -519,21 +555,88 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
             "action":                "nextAction",
         }
         
-        post_headers = dict(headers)
-        post_headers.update({
-            "content-type": "application/x-www-form-urlencoded",
-            "origin":       "https://www.netflix.com",
-            "referer":      "https://www.netflix.com/tv8",
-        })
+        post_headers = {
+            "user-agent":      stealth_headers["User-Agent"],
+            "accept":          stealth_headers["Accept"],
+            "accept-language": stealth_headers["Accept-Language"],
+            "content-type":    "application/x-www-form-urlencoded",
+            "origin":          "https://www.netflix.com",
+            "referer":         "https://www.netflix.com/tv8",
+        }
 
-        res_post = session.post("https://www.netflix.com/tv8", headers=post_headers, data=post_data, proxies=proxy, timeout=15, allow_redirects=True)
-        final_url = res_post.url.rstrip('/').split('?')[0].lower()
+        print(f"[4/4] Submitting POST payload...")
+        res_post = session.post(
+            "https://www.netflix.com/tv8", 
+            headers=post_headers, 
+            data=post_data, 
+            proxies=proxy, 
+            timeout=20, 
+            allow_redirects=True,
+            verify=False
+        )
         
-        if final_url == "https://www.netflix.com/tv/out/success":
-            return True, "Login successful! Your TV is ready to watch.", refreshed_cookie_string
+        final_url = res_post.url.rstrip('/').split('?')[0].lower()
+        response_text = res_post.text.lower()
+        
+        # --- SERVER-SIDE DEBUG LOGGING ---
+        print("\n" + "="*45)
+        print("          TV LOGIN DEBUG RESULTS         ")
+        print("="*45)
+        print(f"Final HTTP Status : {res_post.status_code}")
+        print(f"Final URL Landed  : {final_url}")
+        
+        print("\nRedirection History:")
+        if res_post.history:
+            for i, resp in enumerate(res_post.history):
+                print(f"  {i+1}. HTTP {resp.status_code} -> {resp.url}")
         else:
-            return False, "That TV code wasn't right. Please verify the code and try again.", refreshed_cookie_string
-            
-    except Exception as e:
-        return False, f"Network Error: {str(e)}", netflix_id
+            print("  No redirects occurred.")
 
+        print("\n--- ANALYSIS ---")
+        
+        # --- SMART EVALUATION LOGIC FOR UI RETURNS ---
+        
+        is_pin_form_present = 'pin-input-container' in response_text or 'witcher-code-form' in response_text
+
+        # 1. The Perfect Win
+        if final_url == "https://www.netflix.com/tv/out/success":
+            print("  [SUCCESS] Flawless execution. TV is linked and redirect landed perfectly.")
+            print("="*45 + "\n")
+            return True, "Login successful! Your TV is ready to watch.", netflix_id
+            
+        # 2. The Dead Cookie
+        elif "login" in final_url:
+            print("  [FAILED - DEAD ID] The database cookie is dead. It forced a redirect back to the login screen.")
+            print("="*45 + "\n")
+            return False, "Failed: The database cookie is dead. Account logged out.", netflix_id
+            
+        # 3. The Explicit Invalid Code OR Form Reload
+        elif "tv8" in final_url and (
+            "that code wasn&#x27;t right" in response_text or 
+            "that code wasn't right" in response_text or
+            is_pin_form_present
+        ):
+            print("  [FAILED - REJECTED] Netflix rejected the digits and asked for them again.")
+            print("="*45 + "\n")
+            return False, "That TV code wasn't right. Please verify the code and try again.", netflix_id
+            
+        # 4. The Race Condition Win (HTTP 500 or silent return)
+        elif res_post.status_code == 500 or ("tv8" in final_url and not is_pin_form_present):
+            print("  [SUCCESS - MESSY REDIRECT] Backend authenticated the TV perfectly!")
+            print("  (The web server crashed or dropped the redirect, but the PIN form is gone. TV is logged in.)")
+            print("="*45 + "\n")
+            # Returns TRUE to the API/Frontend!
+            return True, "Login successful! Your TV is ready to watch.", netflix_id
+            
+        # 5. The Catch-all Block (WAF/CAPTCHA)
+        else:
+            print(f"  [ERROR - UNKNOWN STATE] Redirected to an unexpected state (HTTP {res_post.status_code}).")
+            print("="*45 + "\n")
+            return False, f"Network Error: Landed on unexpected state (HTTP {res_post.status_code})", netflix_id
+            
+    except requests.exceptions.ProxyError:
+        print("\n[!] NETWORK ERROR: The proxy rejected the connection or timed out. Proxy is dead.")
+        return False, "Proxy connection failed. Please try again.", netflix_id
+    except Exception as e:
+        print(f"\n[!] UNEXPECTED ERROR: {str(e)}")
+        return False, f"Network Error: {str(e)}", netflix_id
