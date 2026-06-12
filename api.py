@@ -19,6 +19,9 @@ import database
 # Import verify_admin so we can reuse the Username/Password popup!
 from admin import admin_router, verify_admin 
 
+# nftoken logic
+from nftoken_routes import nftoken_router
+
 app = FastAPI(title="OOR Full System")
 
 # --- 1. SECURITY: BROWSER CORS ---
@@ -31,6 +34,9 @@ app.add_middleware(
 )
 
 app.include_router(admin_router)
+
+# nftoken linking
+app.include_router(nftoken_router)
 
 PROXIES = core.load_proxies()
 upload_tasks = {}
@@ -607,6 +613,9 @@ def rescan_dashboard(request: Request, user: str = Depends(verify_admin)):
     return HTMLResponse(content=html)
 
 
+
+
+
 # ==========================================
 # --- GENERAL API ENDPOINTS ---
 # ==========================================
@@ -645,17 +654,40 @@ async def upload_file(
     def run_nfx_and_store():
         q = Queue()
         for nid in id_list: q.put(nid)
-        stats = {"hits": 0, "free": 0, "holds": 0, "dead": 0, "errors": 0, "unknown": 0, "duplicates": 0, "qualities": {}, "plans": {}}
-        print_lock = threading.Lock()
-        guid_lock = threading.Lock()
+        # Add 'saved' and 'filtered' counters
+        stats = {"hits": 0, "free": 0, "holds": 0, "dead": 0, "errors": 0, "unknown": 0, "duplicates": 0, "qualities": {}, "plans": {}, "saved": 0, "filtered": 0}
+        
+        # --- UPGRADED TO RLock to prevent any future deadlocks ---
+        print_lock = threading.RLock()
+        guid_lock = threading.RLock()
+        
         processed_guids = set() 
         detailed_logs = []
+
+
         
         def db_save_hook(data):
-            if req_plan and req_plan.lower() != data["plan"].lower(): return
-            if req_quality and req_quality.lower() != data["quality"].lower(): return
-            if req_language and req_language.lower() != data["language"].lower(): return
+            # Safely cast to string to prevent 'NoneType' crashes on weird accounts
+            safe_plan = str(data.get("plan", "")).lower()
+            safe_quality = str(data.get("quality", "")).lower()
+            safe_lang = str(data.get("language", "")).lower()
+
+            # Track why a hit was rejected by UI filters
+            if req_plan and req_plan.lower() != safe_plan: 
+                with print_lock: stats["filtered"] += 1
+                return
+            if req_quality and req_quality.lower() != safe_quality: 
+                with print_lock: stats["filtered"] += 1
+                return
+            if req_language and req_language.lower() != safe_lang: 
+                with print_lock: stats["filtered"] += 1
+                return
+            
+            # If it survives filters, save it and count it
             database.save_cookie_db(data)
+            with print_lock: stats["saved"] += 1
+                
+
 
         threads = []
         num_cookies = len(id_list)
@@ -671,10 +703,27 @@ async def upload_file(
             threads.append(t)
             
         while any(t.is_alive() for t in threads):
-            upload_tasks[task_id]["checked"] = num_cookies - q.qsize()
+            # Accurately sum everything that has fully completed a network cycle
+            processed = (
+                stats["hits"] + stats["free"] + stats["holds"] + 
+                stats["dead"] + stats["errors"] + stats["unknown"] + stats["duplicates"]
+            )
+            upload_tasks[task_id]["checked"] = processed
             time.sleep(0.5)
 
+
         q.join()
+
+        # --- INSTANT ASSERTIVE LOGGING ---
+        print("\n" + "="*45)
+        print("          UPLOAD & DB SAVE SUMMARY       ")
+        print("="*45)
+        print(f"[+] SAVED TO DB : {stats['saved']} Accounts")
+        print(f"[-] REJECTED    : {stats['filtered']} (Did not match UI filters)")
+        print(f"[-] SKIPPED     : {stats['dead'] + stats['free'] + stats['holds']} (Dead/Free/Hold)")
+        print(f"[-] DROPPED     : {stats['duplicates'] + stats['errors']} (Duplicates/Errors)")
+        print("="*45 + "\n")
+        
         
         # Pull final network status and generate the full log!
         local_ip, proxy_status = core.get_public_ip(request_proxies)

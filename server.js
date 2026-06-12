@@ -6,9 +6,8 @@ const app = express();
 
 // --- Configuration (Set these in Render's Environment Variables) ---
 const PORT = process.env.PORT || 3000;
-const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://187.127.141.77:8888/'; // --- 187.127.141.77 ---
-
-const OWNER_API_KEY = process.env.OWNER_API_KEY || 'oor_4a21a86defdca8eccbf4b5f63912d564';
+const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://194.242.56.38:8888/';
+const OWNER_API_KEY = process.env.OWNER_API_KEY || 'OTTONRENT';
 
 // 1. Serve your index.html safely to the browser
 app.use(express.static(path.join(__dirname, 'public')));
@@ -50,7 +49,15 @@ app.use('/rescan', createProxyMiddleware({
     changeOrigin: true
 }));
 
-// 5. The Documentation Route
+// 5. The Secure NFToken Proxy
+// Forwards /nftoken requests from Render/Vercel to your VPS NFToken Dashboard
+app.use('/nftoken', createProxyMiddleware({
+    target: PYTHON_API_URL,
+    changeOrigin: true
+}));
+
+
+// 6. The Documentation Route
 // This makes the pretty /oordocs URL work instantly
 app.get('/oordocs', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'docs.html'));

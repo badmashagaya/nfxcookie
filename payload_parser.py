@@ -62,13 +62,110 @@ def _deep_find_key(obj, target_key):
             if result: return result
     return None
 
+def find_key_recursively(data, target_key):
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if k == target_key: return v
+            if isinstance(v, (dict, list)):
+                result = find_key_recursively(v, target_key)
+                if result is not None: return result
+    elif isinstance(data, list):
+        for item in data:
+            if isinstance(item, (dict, list)):
+                result = find_key_recursively(item, target_key)
+                if result is not None: return result
+    return None
+
+def extract_brace_matched_json(text, prefix):
+    start_idx = text.find(prefix)
+    if start_idx == -1: return None
+    brace_start = text.find('{', start_idx)
+    if brace_start == -1: return None
+        
+    brace_count, in_string, escape = 0, False, False
+    for i in range(brace_start, len(text)):
+        char = text[i]
+        if escape: escape = False; continue
+        if char == '\\': escape = True; continue
+        if char == '"': in_string = not in_string; continue
+            
+        if not in_string:
+            if char == '{': brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    return text[brace_start:i+1]
+    return None
+
 # --- MAIN PAYLOAD EXTRACTOR ---
-def parse_html(html: str) -> dict:
-    """
-    Hunts down the Netflix reactContext payload, converts it to JSON, 
-    and returns a standardized dictionary of values to core.py.
-    """
-    rc_obj = find_object_after_marker(html, "netflix.reactContext")
+def parse_html(acc_html: str, browse_html: Optional[str] = None) -> dict:
+    # 1. Extract Hold Status strictly from GraphQL using direct string indexing (No CPU bottleneck)
+    is_on_hold_graphql = None
+    graphql_marker = "netflix.reactContext.models.graphql"
+    if graphql_marker in acc_html:
+        idx = acc_html.find(graphql_marker)
+        parse_idx = acc_html.find("JSON.parse('", idx)
+        if parse_idx != -1 and (parse_idx - idx) < 150:
+            end_idx = acc_html.find("');", parse_idx)
+            if end_idx != -1:
+                raw_graphql_str = acc_html[parse_idx + 12:end_idx]
+                try:
+                    cleaned_str = raw_graphql_str.replace('\\"', '"').replace('\\\\', '\\')
+                    cleaned_str = re.sub(r'\\x([0-9a-fA-F]{2})', r'\\u00\1', cleaned_str)
+                    graphql_data = json.loads(cleaned_str)
+                    
+                    hold_val = find_key_recursively(graphql_data, "isUserOnHold")
+                    if hold_val is not None:
+                        is_on_hold_graphql = hold_val
+                except json.JSONDecodeError:
+                    pass
+
+    # 2. Extract Profiles from falcorCache directly
+    total_adult_profiles = 0
+    locked_count = 0
+    falcor_found = False
+
+    def extract_profiles_from_html(html_string):
+        nonlocal total_adult_profiles, locked_count, falcor_found
+        if not html_string: return False
+        
+        if 'netflix.falcorCache' in html_string:
+            falcor_json_str = extract_brace_matched_json(html_string, "netflix.falcorCache")
+            if falcor_json_str:
+                try:
+                    sanitized_json_str = re.sub(r'\\x([0-9a-fA-F]{2})', r'\\u00\1', falcor_json_str)
+                    falcor_data = json.loads(sanitized_json_str)
+                    profiles_dict = falcor_data.get('profiles', {})
+                    
+                    if profiles_dict:
+                        falcor_found = True
+                        
+                    for profile_id, profile_obj in profiles_dict.items():
+                        summary = profile_obj.get('summary', {})
+                        value = summary.get('value')
+                        
+                        if isinstance(value, dict):
+                            is_kids = value.get('isKids', False)
+                            if is_kids: continue
+                            
+                            is_locked = value.get('isPinLocked', False)
+                            total_adult_profiles += 1
+                            if is_locked:
+                                locked_count += 1
+                                
+                    if falcor_found:
+                        return True
+                except json.JSONDecodeError:
+                    pass
+        return False
+
+    if not extract_profiles_from_html(acc_html):
+        extract_profiles_from_html(browse_html)
+
+    unlocked_profiles = (total_adult_profiles - locked_count) if falcor_found else None
+
+    # 3. Fallback extraction logic using standard reactContext
+    rc_obj = find_object_after_marker(acc_html, "netflix.reactContext")
     
     if not rc_obj: 
         return {"error": True}
@@ -78,7 +175,6 @@ def parse_html(html: str) -> dict:
     models = rc_root.get("models", {})
     user_info = models.get("userInfo", {})
     
-    # Gracefully handle nested data nodes
     if "data" in user_info:
         user_info = user_info["data"]
         
@@ -90,7 +186,6 @@ def parse_html(html: str) -> dict:
 
     raw_plan_name = get_path(plan_f, ["localizedPlanName", "value"]) or "Unknown"
     
-    # Language Extraction
     raw_display_lang = None
     user_locale_obj = _deep_find_key(rc_root, "userLocale")
     if user_locale_obj and isinstance(user_locale_obj, dict):
@@ -101,9 +196,12 @@ def parse_html(html: str) -> dict:
 
     membership_status = user_info.get("membershipStatus")
     is_subscribed = (membership_status == "CURRENT_MEMBER")
-    is_on_hold = (fields.get("isPaused", {}).get("value") is True) or (fields.get("isPendingPause", {}).get("value") is True)
+    
+    if is_on_hold_graphql is not None:
+        is_on_hold = is_on_hold_graphql
+    else:
+        is_on_hold = (fields.get("isPaused", {}).get("value") is True) or (fields.get("isPendingPause", {}).get("value") is True)
 
-    # Payment Extraction
     payment_type = "Unknown"
     masked_card = None
     pm_list = fields.get("paymentMethods", {}).get("value") or []
@@ -126,12 +224,6 @@ def parse_html(html: str) -> dict:
     member_since = user_info.get("memberSince") or get_path(fields, ["memberSince", "value"])
     phone = get_path(user_info, ["phoneNumber", "value"]) or "Unknown"
     max_streams = get_path(plan_f, ["maxStreams", "value"])
-    
-    # Fallback to regex for profiles count as it's abstracted out of standard Context 
-    profiles_count = "Unknown"
-    match = re.search(r'>(\d+)\s+profiles<', html, re.IGNORECASE)
-    if match:
-        profiles_count = match.group(1)
 
     return {
         "error": False,
@@ -152,6 +244,6 @@ def parse_html(html: str) -> dict:
         "is_on_hold": is_on_hold,
         "is_subscribed": is_subscribed,
         "membership_status": membership_status,
-        "profiles_count": profiles_count
+        "falcor_found": falcor_found,
+        "unlocked_profiles": unlocked_profiles
     }
-
