@@ -1,0 +1,118 @@
+name: Unzip and Replace Repo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.zip"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: unzip-replace
+  cancel-in-progress: false
+
+jobs:
+  unzip:
+    # Skip the run that the workflow itself creates, just in case.
+    if: "!contains(github.event.head_commit.message, '[auto-unzip]')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Locate uploaded ZIP
+        id: find_zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_FILE=$(find . -maxdepth 3 -type f -name "*.zip" \
+            -not -path "./.git/*" \
+            -not -path "./.github/*" | head -n 1)
+          if [ -z "${ZIP_FILE}" ]; then
+            echo "No ZIP file found at repo root. Nothing to do."
+            echo "zip_file=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Found ZIP: ${ZIP_FILE}"
+          echo "zip_file=${ZIP_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract ZIP to a temp directory
+        if: steps.find_zip.outputs.zip_file != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq unzip
+          rm -rf /tmp/extracted
+          mkdir -p /tmp/extracted
+          unzip -o "$ steps.find_zip.outputs.zip_file " -d /tmp/extracted
+          echo "---- Extracted contents ----"
+          ls -la /tmp/extracted
+
+      - name: Back up this workflow file
+        if: steps.find_zip.outputs.zip_file != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/keep/.github/workflows
+          cp .github/workflows/unzip.yml /tmp/keep/.github/workflows/unzip.yml
+
+      - name: Wipe entire repo working tree (except .git)
+        if: steps.find_zip.outputs.zip_file != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Delete EVERYTHING in the working tree except the .git folder.
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          echo "---- Repo after wipe ----"
+          ls -la
+
+      - name: Move extracted contents into repo root
+        if: steps.find_zip.outputs.zip_file != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s dotglob nullglob
+
+          # If the zip contains a single top-level folder, flatten it.
+          ENTRIES=(/tmp/extracted/*)
+          if [ ${#ENTRIES[@]} -eq 1 ] && [ -d "${ENTRIES[0]}" ]; then
+            echo "Flattening single top-level folder: ${ENTRIES[0]}"
+            mv "${ENTRIES[0]}"/* "$GITHUB_WORKSPACE"/ 2>/dev/null || true
+          else
+            cp -a /tmp/extracted/. "$GITHUB_WORKSPACE"/
+          fi
+
+          echo "---- Repo after extraction ----"
+          ls -la
+
+      - name: Restore the workflow file (so the automation survives)
+        if: steps.find_zip.outputs.zip_file != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/workflows
+          cp /tmp/keep/.github/workflows/unzip.yml .github/workflows/unzip.yml
+
+      - name: Commit and push the replacement
+        if: steps.find_zip.outputs.zip_file != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes detected after extraction."
+            exit 0
+          fi
+
+          git commit -m "[auto-unzip] Replace repo with extracted ZIP contents"
+          git push origin main
