@@ -111,6 +111,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          
+          # DELETE any new workflows that came from the ZIP so GitHub doesn't block the push
+          find .github/workflows -type f ! -name 'unzip.yml' -delete || true
+
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
