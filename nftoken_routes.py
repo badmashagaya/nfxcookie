@@ -32,6 +32,44 @@ def verify_security(api_key: str = Depends(api_key_header)):
 
 # --- API ENDPOINTS ---
 
+@nftoken_router.get("/api/debug-httpx")
+async def debug_httpx():
+    import asyncio
+    import httpx
+    import core
+
+    try:
+        with open("rescan_proxies.txt", "rb") as f:
+            proxies = core.parse_proxies_from_bytes(f.read())
+
+        proxy_dict = core.get_smart_proxy(proxies)
+        proxy = proxy_dict["http"]
+
+        loop = asyncio.get_running_loop()
+
+        async with httpx.AsyncClient(
+            proxy=proxy,
+            verify=False,
+            timeout=20.0
+        ) as client:
+            r = await client.get("https://httpbin.org/ip")
+
+        return {
+            "success": True,
+            "status": r.status_code,
+            "loop": type(loop).__name__,
+            "proxy_selected": True
+        }
+
+    except BaseException as e:
+        return {
+            "success": False,
+            "exception": type(e).__name__,
+            "detail": repr(e)
+        }
+
+
+
 @nftoken_router.post("/api/nftoken/generate")
 async def api_generate_nftoken(
     plan: Optional[str] = Form(""),
